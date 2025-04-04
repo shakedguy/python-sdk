@@ -1,0 +1,21 @@
+version: '3'
+
+tasks:
+  lint:
+    cmds:
+      - ruff check --fix --select I
+
+  test:
+    cmds:
+      - ./.venv/bin/pytest ./tests -vv
+
+  tmp:
+    cmds:
+      - uv run tmp.py
+
+  push:
+    cmds:
+      - task: lint
+      - git add .
+      - git commit -m "{{.CLI_ARGS}}"
+      - git push origin $(git branch --show-current)
