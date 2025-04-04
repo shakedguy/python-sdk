@@ -1,0 +1,15 @@
+RULE_ENGINE_CONNECTION_NAME = "rule-engine-service"
+PYBOT_CONNECTION_NAME = "pybot-service"
+BOT_API_CONNECTION_NAME = "bot-api-service"
+RULE_ENGINE_QUEUE_NAME = "rule-engine"
+BOT_API_QUEUE_NAME = "bot-api"
+RAILWAY_QUEUE_NAME = "ai.railway"
+TRANSLATE_QUEUE_NAME = "ai.translate"
+
+
+QUEUES: set[str] = {
+    RULE_ENGINE_QUEUE_NAME,
+    BOT_API_QUEUE_NAME,
+    RAILWAY_QUEUE_NAME,
+    TRANSLATE_QUEUE_NAME,
+}
