@@ -206,8 +206,7 @@ class RabbitMQ(AbstractContextManager):
         if queue not in self.declared_queues:
             self.declared_queues.append(queue)
             queue_obj = await self.async_channel.declare_queue(
-                name=queue,
-                auto_delete=False,
+                name=queue, durable=True, exclusive=False, auto_delete=False
             )
             if exchange != "":
                 await queue_obj.bind(exchange=exchange)
@@ -254,8 +253,7 @@ class RabbitMQ(AbstractContextManager):
         if queue not in self.declared_queues:
             self.declared_queues.append(queue)
             self.sync_channel.queue_declare(
-                queue=queue,
-                auto_delete=False,
+                queue=queue, durable=True, exclusive=False, auto_delete=False
             )
             if exchange != "":
                 self.sync_channel.queue_bind(
@@ -281,8 +279,7 @@ class RabbitMQ(AbstractContextManager):
     def get(self, queue: str, auto_ack: bool = True) -> Optional[bytes]:
         if queue not in self.declared_queues:
             self.sync_channel.queue_declare(
-                queue=queue,
-                auto_delete=False,
+                queue=queue, durable=True, exclusive=False, auto_delete=False
             )
             self.declared_queues.append(queue)
 
@@ -307,8 +304,7 @@ class RabbitMQ(AbstractContextManager):
 
         else:
             fetcher = await self.async_channel.declare_queue(
-                name=queue,
-                auto_delete=False,
+                name=queue, durable=True, exclusive=False, auto_delete=False
             )
             self.declared_queues.append(queue)
         for _ in range(3):
@@ -334,7 +330,7 @@ class RabbitMQ(AbstractContextManager):
 
         if queue not in self.declared_queues:
             consumer = await self.async_channel.declare_queue(
-                name=queue,
+                name=queue, durable=True, exclusive=False, auto_delete=False
             )
         else:
             consumer = await self.async_channel.get_queue(name=queue)
@@ -356,8 +352,7 @@ class RabbitMQ(AbstractContextManager):
         self.sync_channel.basic_qos(prefetch_count=concurrent)
         if queue not in self.declared_queues:
             self.sync_channel.queue_declare(
-                queue=queue,
-                auto_delete=False,
+                queue=queue, durable=True, exclusive=False, auto_delete=False
             )
             self.declared_queues.append(queue)
 
