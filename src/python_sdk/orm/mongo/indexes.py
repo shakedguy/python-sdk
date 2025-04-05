@@ -5,8 +5,8 @@ from pydantic import (
 )
 from pymongo import ASCENDING, DESCENDING, GEO2D, GEOSPHERE, HASHED, TEXT
 
-from src.python_sdk.orm.models.model import BaseModel
-from src.python_sdk.utils import enums
+from ...utils import enums
+from ..models.model import BaseModel
 
 
 class DocumentIndexType(enums.StrEnum):
