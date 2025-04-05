@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import ssl
 import time
@@ -276,6 +277,49 @@ class RabbitMQ(AbstractContextManager):
                 delivery_mode=delivery_mode,
             ),
         )
+
+    def get(self, queue: str, auto_ack: bool = True) -> Optional[bytes]:
+        if queue not in self.declared_queues:
+            self.sync_channel.queue_declare(
+                queue=queue,
+                auto_delete=False,
+            )
+            self.declared_queues.append(queue)
+
+        for _ in range(3):
+            try:
+                method_frame, header_frame, body = self.sync_channel.basic_get(
+                    queue=queue, auto_ack=auto_ack
+                )
+                if method_frame:
+                    return body
+
+            except Exception as e:
+                logger.exception("Error during getting message: %s", e)
+            time.sleep(0.2)
+        return None
+
+    async def get_async(
+        self, queue: str, no_ack: bool = False
+    ) -> Optional[AbstractIncomingMessage]:
+        if queue in self.declared_queues:
+            fetcher = self.async_channel.get_queue(name=queue)
+
+        else:
+            fetcher = await self.async_channel.declare_queue(
+                name=queue,
+                auto_delete=False,
+            )
+            self.declared_queues.append(queue)
+        for _ in range(3):
+            try:
+                message = await fetcher.get(no_ack=no_ack)
+                if message:
+                    return message
+            except Exception as e:
+                logger.exception("Error during getting message: %s", e)
+            await asyncio.sleep(0.2)
+        return None
 
     async def subscribe_async(
         self,
