@@ -191,6 +191,7 @@ class RabbitMQ(AbstractContextManager):
         exchange_type: Optional[ExchangeType] = None,
         expiration: Optional[Union[int, str]] = None,
         delivery_mode: Optional[AioPikaDeliveryMode] = None,
+        ttl: Optional[int] = None,
     ) -> None:
         exchange = exchange or ""
 
@@ -206,7 +207,11 @@ class RabbitMQ(AbstractContextManager):
         if queue not in self.declared_queues:
             self.declared_queues.append(queue)
             queue_obj = await self.async_channel.declare_queue(
-                name=queue, durable=True, exclusive=False, auto_delete=False
+                name=queue,
+                durable=True,
+                exclusive=False,
+                auto_delete=False,
+                arguments={"x-message-ttl": ttl} if ttl else None,
             )
             if exchange != "":
                 await queue_obj.bind(exchange=exchange)
@@ -240,6 +245,7 @@ class RabbitMQ(AbstractContextManager):
         exchange_type: Optional[ExchangeType] = None,
         expiration: Optional[Union[int, str]] = None,
         delivery_mode: Optional[DeliveryMode] = None,
+        ttl: Optional[int] = None,
     ) -> None:
         exchange = exchange or ""
         exchange_type = exchange_type or ExchangeType.direct
@@ -254,7 +260,11 @@ class RabbitMQ(AbstractContextManager):
         if queue not in self.declared_queues:
             self.declared_queues.append(queue)
             self.sync_channel.queue_declare(
-                queue=queue, durable=True, exclusive=False, auto_delete=False
+                queue=queue,
+                durable=True,
+                exclusive=False,
+                auto_delete=False,
+                arguments={"x-message-ttl": ttl} if ttl else None,
             )
             if exchange != "":
                 self.sync_channel.queue_bind(
@@ -278,10 +288,16 @@ class RabbitMQ(AbstractContextManager):
             ),
         )
 
-    def get(self, queue: str, auto_ack: bool = True) -> Optional[bytes]:
+    def get(
+        self, queue: str, auto_ack: bool = True, ttl: Optional[int] = None
+    ) -> Optional[bytes]:
         if queue not in self.declared_queues:
             self.sync_channel.queue_declare(
-                queue=queue, durable=True, exclusive=False, auto_delete=False
+                queue=queue,
+                durable=True,
+                exclusive=False,
+                auto_delete=False,
+                arguments={"x-message-ttl": ttl} if ttl else None,
             )
             self.declared_queues.append(queue)
 
@@ -299,14 +315,18 @@ class RabbitMQ(AbstractContextManager):
         return None
 
     async def get_async(
-        self, queue: str, no_ack: bool = False
+        self, queue: str, no_ack: bool = False, ttl: Optional[int] = None
     ) -> Optional[AbstractIncomingMessage]:
         if queue in self.declared_queues:
             fetcher = self.async_channel.get_queue(name=queue)
 
         else:
             fetcher = await self.async_channel.declare_queue(
-                name=queue, durable=True, exclusive=False, auto_delete=False
+                name=queue,
+                durable=True,
+                exclusive=False,
+                auto_delete=False,
+                arguments={"x-message-ttl": ttl} if ttl else None,
             )
             self.declared_queues.append(queue)
         for _ in range(3):
