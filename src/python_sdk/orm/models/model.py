@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, Literal, Union, cast
+from typing import Any, Literal, Union, cast, override
 
 from bson.objectid import ObjectId
 from pydantic import (
@@ -10,7 +10,6 @@ from pydantic import (
 from pydantic import (
     ConfigDict,
     Field,
-    model_serializer,
     model_validator,
 )
 
@@ -89,13 +88,13 @@ class BaseModel(PydanticBaseModel, mixins.DictMixin):
     def model_fields_set(cls) -> set[str]:
         return set(sorted((cast(dict, cls.model_fields)).keys()))
 
-    @model_serializer
-    def ser_model(self) -> dict[str, Any]:
-        return base_serializer(self)
+    @override
+    def model_dump(self, **kwargs) -> dict[str, Any]:
+        return super().model_dump(serialize_as_any=True, **kwargs)
 
-    @model_serializer(when_used="json-unless-none")
-    def ser_model_json(self) -> dict[str, Any]:
-        return base_serializer(self, mode="json")
+    @override
+    def model_dump_json(self, **kwargs) -> str:
+        return super().model_dump_json(serialize_as_any=True, **kwargs)
 
     @cached_property
     def flatten(self) -> dict[str, Any]:

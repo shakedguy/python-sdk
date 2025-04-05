@@ -4,8 +4,8 @@ from pydantic import Field
 
 from ... import errors
 from ...utils import DateTime, Strings
-from .fields import DateTimeField, EntityID
-from .model import BaseModel
+from ..models.fields import DateTimeField, EntityID
+from ..models.model import BaseModel
 
 
 class SQLModel(BaseModel):
