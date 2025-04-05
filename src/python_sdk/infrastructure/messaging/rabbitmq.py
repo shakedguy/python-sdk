@@ -195,7 +195,7 @@ class RabbitMQ(AbstractContextManager):
         exchange = exchange or ""
 
         exchange_type = exchange_type or ExchangeType.direct
-        delivery_mode = delivery_mode or AioPikaDeliveryMode.NOT_PERSISTENT
+        delivery_mode = delivery_mode or AioPikaDeliveryMode.PERSISTENT
 
         publish_exchange: Optional[AbstractExchange] = None
         if exchange not in self.declared_exchanges:
@@ -229,6 +229,7 @@ class RabbitMQ(AbstractContextManager):
                 delivery_mode=delivery_mode,
             ),
             routing_key=queue,
+            mandatory=True,
         )
 
     def publish(
@@ -242,7 +243,7 @@ class RabbitMQ(AbstractContextManager):
     ) -> None:
         exchange = exchange or ""
         exchange_type = exchange_type or ExchangeType.direct
-        delivery_mode = delivery_mode or DeliveryMode.Transient
+        delivery_mode = delivery_mode or DeliveryMode.Persistent
 
         if exchange not in self.declared_exchanges:
             self.sync_channel.exchange_declare(
@@ -268,6 +269,7 @@ class RabbitMQ(AbstractContextManager):
             exchange=exchange,
             routing_key=queue,
             body=body,
+            mandatory=True,
             properties=pika.BasicProperties(
                 content_type="text/plain",
                 content_encoding="utf-8",
