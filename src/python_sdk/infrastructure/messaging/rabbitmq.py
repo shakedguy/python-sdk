@@ -346,13 +346,18 @@ class RabbitMQ(AbstractContextManager):
         no_ack: bool = False,
         concurrent: int = 1,
         consumer_tag: Optional[str] = None,
+        ttl: Optional[int] = None,
     ) -> None:
         consumer_tag = consumer_tag or Crypto.uuid7()
         await self.async_channel.set_qos(prefetch_count=concurrent)
 
         if queue not in self.declared_queues:
             consumer = await self.async_channel.declare_queue(
-                name=queue, durable=True, exclusive=False, auto_delete=False
+                name=queue,
+                durable=True,
+                exclusive=False,
+                auto_delete=False,
+                arguments={"x-message-ttl": ttl} if ttl else None,
             )
         else:
             consumer = await self.async_channel.get_queue(name=queue)
@@ -369,12 +374,17 @@ class RabbitMQ(AbstractContextManager):
         concurrent: int = 1,
         timeout: Optional[int] = None,
         consumer_tag: Optional[str] = None,
+        ttl: Optional[int] = None,
     ) -> None:
         consumer_tag = consumer_tag or Crypto.uuid7()
         self.sync_channel.basic_qos(prefetch_count=concurrent)
         if queue not in self.declared_queues:
             self.sync_channel.queue_declare(
-                queue=queue, durable=True, exclusive=False, auto_delete=False
+                queue=queue,
+                durable=True,
+                exclusive=False,
+                auto_delete=False,
+                arguments={"x-message-ttl": ttl} if ttl else None,
             )
             self.declared_queues.append(queue)
 
