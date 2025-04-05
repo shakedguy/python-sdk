@@ -19,7 +19,7 @@ from pydantic_core.core_schema import (
     ValidationInfo,
 )
 
-from ...utils import Crypto, DateTime
+from ...utils import Crypto, DateTime, Strings
 
 T = TypeVar("T")
 
@@ -76,6 +76,22 @@ JsonField: JsonValue = Annotated[JsonValue, BeforeValidator(_parse_json_field)]
 UUIDField: Optional[str] = Annotated[
     Optional[str], BeforeValidator(lambda x: str(x or Crypto.uuid7()))
 ]
+
+
+def _validate_phone_number(value: Any) -> str:
+    res = ""
+    if isinstance(value, str):
+        res = Strings.format_phone_number(value)
+    elif isinstance(value, (int, float)):
+        res = Strings.format_phone_number(str(value))
+
+    if len(res):
+        return res
+
+    raise ValueError("Invalid phone number format")
+
+
+PhoneNumberField: str = Annotated[str, BeforeValidator(_validate_phone_number)]  # type: ignore
 
 
 plain_validator = (
