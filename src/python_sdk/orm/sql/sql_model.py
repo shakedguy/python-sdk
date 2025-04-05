@@ -4,12 +4,12 @@ from pydantic import Field
 
 from ... import errors
 from ...utils import DateTime, Strings
-from ..models.fields import DateTimeField, EntityID
+from ..models.fields import DateTimeField, EntityIdField
 from ..models.model import BaseModel
 
 
 class SQLModel(BaseModel):
-    id: EntityID = Field(
+    id: EntityIdField = Field(
         default=None, title="Id", description="The primary key of the table."
     )
 

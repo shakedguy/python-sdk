@@ -45,8 +45,8 @@ DateTimeField: Optional[datetime] = Annotated[
     BeforeValidator(lambda x: DateTime.to_app_timezone(x) if x else None),
 ]
 
-EntityID: Optional[PositiveInt] = Annotated[
-    Optional[PositiveInt], BeforeValidator(lambda x: int(x) if x else None)
+EntityIdField: PositiveInt = Annotated[
+    PositiveInt, BeforeValidator(lambda x: int(x) if x else None)
 ]
 
 
