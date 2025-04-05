@@ -36,7 +36,7 @@ class DocumentModel(BaseModel, MongoQueriesMixin, MongoCommandsMixin):
         default=1,
         title="Version",
         description="The version of the record.",
-        validation_alias=AliasChoices("version", "_version"),
+        validation_alias=AliasChoices("version", "_version", "__v"),
     )
 
     class Meta:
@@ -97,11 +97,13 @@ class DocumentTimeStampedModel(DocumentModel):
         default=DateTime.now(),
         title="Created At",
         description="The date and time the record was created.",
+        validation_alias=AliasChoices("created_at", "createdAt"),
     )
     updated_at: DateTimeField = Field(
         default=DateTime.now(),
         title="Updated At",
         description="The date and time the record was last updated.",
+        validation_alias=AliasChoices("updated_at", "updatedAt"),
     )
 
     @override
