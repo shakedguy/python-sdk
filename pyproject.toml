@@ -23,6 +23,7 @@ dependencies = [
     "py-cachify>=2.0.10",
     "pydantic-settings>=2.8.1",
     "pydantic[email]>=2.11.2",
+    "pydash>=8.0.5",
     "pymongo>=4.11.3",
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.2",
