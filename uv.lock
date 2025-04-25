@@ -211,6 +211,33 @@ wheels = [
 ]
 
 [[package]]
+name = "fast-depends"
+version = "2.4.12"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/85/f5/8b42b7588a67ad78991e5e7ca0e0c6a1ded535a69a725e4e48d3346a20c1/fast_depends-2.4.12.tar.gz", hash = "sha256:9393e6de827f7afa0141e54fa9553b737396aaf06bd0040e159d1f790487b16d", size = 16682 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/08/4adb160d8394053289fdf3b276e93b53271fd463e54fff8911b23c1db4ed/fast_depends-2.4.12-py3-none-any.whl", hash = "sha256:9e5d110ddc962329e46c9b35e5fe65655984247a13ee3ca5a33186db7d2d75c2", size = 17651 },
+]
+
+[[package]]
+name = "faststream"
+version = "0.5.39"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "fast-depends" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/86/22/190abd60a6fb38d44c45567556b0cafc7a37eb5919ef0b9a1a37b77678e7/faststream-0.5.39.tar.gz", hash = "sha256:fe13ed5d643043682c19867e918e0edb552755e284cc1c9e3595cf760c335a0c", size = 292976 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/18/41/ce4c906923492cc93b9cf58ab3136231a3d52b531d3f86f97b5c83ef6e7f/faststream-0.5.39-py3-none-any.whl", hash = "sha256:5928e9e85d3e2a06a0780e068b0ddc1081a13c802789e0684df3971dbcc816e2", size = 392881 },
+]
+
+[[package]]
 name = "filelock"
 version = "3.18.0"
 source = { registry = "https://pypi.org/simple" }
@@ -920,6 +947,7 @@ dependencies = [
     { name = "asyncpg" },
     { name = "colorlog" },
     { name = "dnspython" },
+    { name = "faststream" },
     { name = "httpx" },
     { name = "inflect" },
     { name = "jinja2" },
@@ -956,6 +984,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "colorlog", specifier = ">=6.9.0" },
     { name = "dnspython", specifier = ">=2.7.0" },
+    { name = "faststream", specifier = ">=0.5.39" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "inflect", specifier = ">=7.5.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
