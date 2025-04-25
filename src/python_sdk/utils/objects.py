@@ -1,7 +1,9 @@
 import copy
+import inspect
 from abc import ABC
 from typing import Any, Callable, Collection, Type, TypeVar, Union
 
+import pydash as _
 from pydantic import BaseModel
 
 from . import is_iterable_except_str_like
@@ -73,15 +75,14 @@ def recursive_sort_keys(
         dict[str, Any] | Collection[Any]: The sorted dictionary or list of dictionaries.
     """
 
-    if isinstance(input_value, dict):
+    if not _.is_iterable(input_value):
+        raise ValueError("Invalid input, must be an iterable")
+    if _.is_dict(input_value):
         return dict(sorted(dict(input_value).items()))
 
-    if isinstance(input_value, Collection):
-        return _return_same_iterable(
-            input_value, [recursive_sort_keys(item) for item in input_value]
-        )
-
-    return input_value
+    return _return_same_iterable(
+        input_value, [recursive_sort_keys(item) for item in input_value]
+    )
 
 
 class ChangeKeysCase(ABC):  # noqa
@@ -195,7 +196,7 @@ class ChangeKeysCase(ABC):  # noqa
         if isinstance(input_obj, (bytes, str, bytearray, memoryview)):
             return method(input_obj)
 
-        if isinstance(input_obj, dict):
+        if _.is_dict(input_obj):
             for key in filter(lambda k: k.startswith("_"), input_obj.keys()):
                 new_key = str(key).lstrip("_")
                 if new_key in input_obj:
@@ -232,10 +233,10 @@ class ChangeKeysCase(ABC):  # noqa
         Returns:
             dict[str, Any] | Collection[Any]: The dictionary with keys converted to dot case.
         """
-        if not isinstance(input_obj, (ValidIterables, dict)):
+        if not _.is_iterable(input_obj):
             raise ValueError("Invalid input, must be an iterable")
 
-        if not isinstance(input_obj, dict):
+        if not _.is_dict(input_obj):
             return _return_same_iterable(
                 input_obj,
                 [
@@ -288,15 +289,14 @@ class ChangeKeysCase(ABC):  # noqa
             for key, value in dict(obj_copy).items():
                 new_value = (
                     ChangeKeysCase.flatten_all_cases(value)
-                    if isinstance(value, (Collection, dict))
-                    and not isinstance(value, str)
+                    if _.is_iterable(value) and not _.is_string(value)
                     else value
                 )
                 result.update(
                     {
-                        Strings.to_camel_case(key): new_value,
-                        Strings.to_snake_case(key): new_value,
-                        Strings.to_kebab_case(key): new_value,
+                        _.camel_case(key): new_value,
+                        _.snake_case(key): new_value,
+                        _.kebab_case(key): new_value,
                         Strings.to_pascale_case(key): new_value,
                         Strings.to_constant_case(key): new_value,
                     }
@@ -321,10 +321,18 @@ def find_subclasses(base_class: Type[T]) -> list[Type[T]]:
     Returns:
         list: A list of all subclasses (direct and indirect)
     """
+    from .. import domain
+
     direct_subclasses = base_class.__subclasses__()
     all_subclasses = list(direct_subclasses)
 
     for subclass in direct_subclasses:
         all_subclasses.extend(find_subclasses(subclass))
 
-    return list(dict.fromkeys(all_subclasses))
+    res = list(dict.fromkeys(all_subclasses))
+
+    for item in inspect.getmembers(domain):
+        if type(item[1]) is type and issubclass(item[1], base_class):
+            res.append(item[1])
+
+    return res

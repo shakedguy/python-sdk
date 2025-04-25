@@ -53,17 +53,18 @@ def base_serializer(
     if isinstance(model, PydanticBaseModel):
         for key, field in model.model_computed_fields.items():
             field_name = field.alias or key
+
             value = getattr(model, key)
-            res[field_name] = _serialize_field(value, mode)
+            res.setdefault(field_name, _serialize_field(value, mode))
 
         for key, field in model.model_fields.items():
             value = getattr(model, key)
             field_name = field.alias or key
-            res[field_name] = _serialize_field(value, mode)
+            res.setdefault(field_name, _serialize_field(value, mode))
 
     else:
         for key, value in model.items():
-            res[key] = _serialize_field(value, mode)
+            res.setdefault(key, _serialize_field(value, mode))
 
     return res
 
@@ -75,6 +76,8 @@ class BaseModel(PydanticBaseModel, mixins.DictMixin):
         extra="allow",
         populate_by_name=True,
         ser_json_timedelta="iso8601",
+        arbitrary_types_allowed=True,
+        allow_inf_nan=True,
     )
 
     @model_validator(mode="before")
@@ -101,7 +104,7 @@ class BaseModel(PydanticBaseModel, mixins.DictMixin):
         return ChangeKeysCase.flatten_all_cases(base_serializer(self))
 
 
-class TimestampModel(BaseModel):
+class TimestampedModel(BaseModel):
     created_at: DateTimeField = Field(
         default=DateTime.now(),
         title="Created At",

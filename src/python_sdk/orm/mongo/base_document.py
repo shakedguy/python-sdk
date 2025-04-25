@@ -1,12 +1,15 @@
-from typing import Any, Mapping, Optional, Union
+from __future__ import annotations
+
+from collections.abc import Collection
+from typing import Any, Mapping, Optional, Union, cast
 
 from pydantic import (
     Field,
 )
 from pymongo import ASCENDING, DESCENDING, GEO2D, GEOSPHERE, HASHED, TEXT
 
-from ...utils import enums
-from ..models.model import BaseModel
+from ...utils import Strings, enums
+from ..models.base_model import BaseModel
 
 
 class DocumentIndexType(enums.StrEnum):
@@ -47,3 +50,27 @@ class DocumentIndex(BaseModel):
     @property
     def pymongo_keys(self) -> Mapping[str, Any]:
         return {k: v.pymongo_value for k, v in self.fields.items()}
+
+
+class BaseDocument(BaseModel):
+    class Meta:
+        collection_name: str = ""
+        indexes: Collection[DocumentIndex] = list()
+
+    @classmethod
+    def get_collection_name(cls) -> str:
+        return getattr(cls.Meta, "collection_name", None) or Strings.to_snake_case(
+            Strings.to_plural(cls.__name__)
+        )
+
+    @classmethod
+    def get_fields(cls) -> set[str]:
+        return set(sorted((cast(dict, cls.model_fields)).keys()))
+
+    def before_update(self) -> None: ...
+
+    def before_insert(self) -> None: ...
+
+    async def before_update_async(self) -> None: ...
+
+    async def before_insert_async(self) -> None: ...

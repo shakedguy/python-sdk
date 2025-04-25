@@ -1,12 +1,15 @@
 import re
 from datetime import UTC, date, datetime, time, timedelta
 from typing import AnyStr, Literal, Optional, Self, Union, override
+from zoneinfo import ZoneInfo
 
 from dateutil import parser
 from dateutil.relativedelta import relativedelta
 
 from ..conf import constants
 from .strings import Strings
+
+Unit = Literal["seconds", "minutes", "hours", "days", "weeks", "months", "years"]
 
 
 class DateTime(datetime):
@@ -72,8 +75,8 @@ class DateTime(datetime):
     def add(
         self,
         *,
-        num: int,
-        unit: Literal["seconds,minutes,hours,days,weeks,months,years"],
+        num: Union[int, float],
+        unit: Unit,
     ) -> Self:
         """
         Adds a specified number of units to the datetime.
@@ -91,8 +94,8 @@ class DateTime(datetime):
     def subtract(
         self,
         *,
-        num: int,
-        unit: Literal["seconds,minutes,hours,days,weeks,months,years"],
+        num: Union[int, float],
+        unit: Unit,
     ) -> Self:
         """
         Subtracts a specified number of units from the datetime.
@@ -109,8 +112,8 @@ class DateTime(datetime):
     def _calc(
         self,
         *,
-        num: int,
-        unit: Literal["seconds,minutes,hours,days,weeks,months,years"],
+        num: Union[int, float],
+        unit: Unit,
         op: Literal["add", "subtract"],
     ):
         if op == "subtract":
@@ -271,6 +274,34 @@ class DateTime(datetime):
         return cls.utc_now().isoformat()
 
     @classmethod
+    def to_datetime(cls, dt: Union[datetime, str, int | float]) -> datetime:
+        """
+        Converts a datetime object to a datetime object.
+
+        Args:
+            dt (Union[datetime, str, int | float]): The datetime object to convert.
+
+        Returns:
+            datetime: The datetime object.
+        """
+
+        if not dt:
+            return dt
+
+        if isinstance(dt, datetime):
+            return dt
+        if isinstance(dt, str):
+            dt = cls.from_str(dt)
+            if dt:
+                return dt
+        if isinstance(dt, (int, float)):
+            return datetime.fromtimestamp(dt)
+
+        raise ValueError(
+            "Invalid input, must be a datetime object, string, or timestamp"
+        )
+
+    @classmethod
     def to_app_timezone(cls, dt: Union[datetime, str, int | float]) -> Self:
         """
         Converts a datetime object to the configured app timezone.
@@ -284,11 +315,13 @@ class DateTime(datetime):
         from ..conf import settings
 
         if isinstance(dt, datetime):
-            return DateTime.from_datetime(dt.astimezone(settings.timezone))
+            if dt.tzinfo != settings.timezone_name:
+                dt = dt.replace(tzinfo=ZoneInfo(settings.timezone_name))
+                return cls.from_datetime(dt)
+            return DateTime.from_datetime(dt)
         if isinstance(dt, str):
-            dt = cls.from_str(dt)
-            if dt:
-                return dt.astimezone(settings.timezone)
+            return cls.from_str(dt)
+
         if isinstance(dt, (int, float)):
             return DateTime.from_datetime(
                 datetime.fromtimestamp(dt, tz=settings.timezone)
@@ -381,10 +414,6 @@ class DateTime(datetime):
                 for pattern in constants.TIME_ONLY_REGEX_PATTERNS.keys()
             )
 
-    @classmethod
-    def timestamp(cls) -> float:
-        return cls.now().timestamp()
-
     @staticmethod
     def to_date_only(inpt: Union[datetime, AnyStr, int | float]) -> date:
         """
@@ -399,7 +428,7 @@ class DateTime(datetime):
         return DateTime.to_app_timezone(inpt).date()
 
     @staticmethod
-    def to_time_only(inpt: Union[datetime, AnyStr, int | float]) -> time:
+    def to_time_only(inpt: Union[datetime, AnyStr, int, float]) -> time:
         """
         Converts a datetime object to time only.
 
@@ -410,3 +439,45 @@ class DateTime(datetime):
             time: The time object.
         """
         return DateTime.to_app_timezone(inpt).time()
+
+    @staticmethod
+    def duration(
+        *,
+        start: Union[datetime, AnyStr, int, float],
+        end: Union[datetime, AnyStr, int, float],
+        unit: Unit = "seconds",
+    ) -> float:
+        """
+        Calculates the duration between two datetime objects.
+
+        Args:
+            start (Union[datetime, str, int | float]): The start datetime.
+            end (Union[datetime, str, int | float]): The end datetime.
+            unit (str): The unit to return the duration in.
+
+        Returns:
+            float: The duration in the specified unit.
+        """
+        start = DateTime.to_app_timezone(start)
+        end = DateTime.to_app_timezone(end)
+        delta = end - start
+
+        match unit:
+            case "seconds":
+                result = delta.total_seconds()
+            case "minutes":
+                result = delta.total_seconds() / 60
+            case "hours":
+                result = delta.total_seconds() / 3600
+            case "days":
+                result = delta.days
+            case "weeks":
+                result = delta.days / 7
+            case "months":
+                result = delta.days / 30
+            case "years":
+                result = delta.days / 365
+            case _:
+                raise ValueError("Invalid unit for duration calculation")
+
+        return round(result, 3) if isinstance(result, float) else result

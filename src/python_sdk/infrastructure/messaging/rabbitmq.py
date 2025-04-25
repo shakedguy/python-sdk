@@ -1,15 +1,15 @@
 import asyncio
 import logging
 import ssl
-import time
 from asyncio import Semaphore
+from collections.abc import Awaitable, Collection
 from contextlib import AbstractContextManager
 from functools import cache
 from ssl import SSLContext
 from threading import Lock, Thread
-from typing import Any, AnyStr, Awaitable, Callable, Optional, Self, Union
+from time import sleep, time
+from typing import Any, AnyStr, Callable, Optional, Self, Union
 
-import pika
 from aio_pika import Message, connect_robust
 from aio_pika.abc import (
     AbstractExchange,
@@ -20,141 +20,30 @@ from aio_pika.abc import (
 from aio_pika.abc import (
     DeliveryMode as AioPikaDeliveryMode,
 )
-from pika import BlockingConnection, SSLOptions
+from faststream.rabbit import RabbitBroker as RB  # noqa
+from faststream.rabbit.fastapi import RabbitRouter
+from faststream.security import BaseSecurity
+from pika import BasicProperties, BlockingConnection, ConnectionParameters, SSLOptions
 from pika.adapters.blocking_connection import BlockingChannel
+from pika.credentials import ExternalCredentials
 from pika.delivery_mode import DeliveryMode
 from pika.exchange_type import ExchangeType
+from taskiq_faststream import BrokerWrapper
 
 from ...conf import settings
 from ...conf.logger import get_logger
-from ...utils import Crypto
+from ...utils.crypto import Crypto
 from ...utils.decorators import singleton
 
 logging.getLogger("pika").setLevel(logging.ERROR)
+logging.getLogger("aiormq.channel").setLevel(logging.FATAL)
 logger = get_logger(name="RabbitMQ", level=logging.DEBUG)
-
-
-@singleton
-class RabbitMQConnectionManager:
-    sync_connection: Optional[BlockingConnection] = None
-    sync_channel: Optional[BlockingChannel] = None
-    async_connection: Optional[AbstractRobustConnection] = None
-    async_channel: Optional[AbstractRobustChannel] = None
-    connection_mutex: Lock = Lock()
-    channel_mutex: Lock = Lock()
-    connection_sem: Semaphore = Semaphore(1)
-    channel_sem: Semaphore = Semaphore(1)
-
-    def __init__(self):
-        self.sync_connection = RabbitMQConnectionManager.create_connection()
-
-    @classmethod
-    def create_connection(cls) -> BlockingConnection:
-        with RabbitMQConnectionManager.connection_mutex:
-            if RabbitMQConnectionManager.sync_connection is None:
-                logger.debug("Connecting to RabbitMQ")
-                RabbitMQConnectionManager.sync_connection = _create_sync_connection()
-
-        return RabbitMQConnectionManager.sync_connection
-
-    @classmethod
-    async def create_async_connection(cls) -> AbstractRobustConnection:
-        async with RabbitMQConnectionManager.connection_sem:
-            if RabbitMQConnectionManager.async_connection is None:
-                logger.debug("Connecting to RabbitMQ")
-                RabbitMQConnectionManager.async_connection = (
-                    await _create_async_connection()
-                )
-        return RabbitMQConnectionManager.async_connection
-
-    @classmethod
-    def close(cls) -> None:
-        try:
-            if cls.sync_connection and cls.sync_connection.is_open:
-                cls.close_channel()
-                logger.debug("Closing RabbitMQ connection")
-                cls.sync_connection.close()
-                cls.sync_connection = None
-        except:  # noqa
-            pass
-
-    @classmethod
-    async def close_async(cls) -> None:
-        if cls.async_connection and not cls.async_connection.is_closed:
-            await cls.close_async_channel()
-            logger.debug("Closing RabbitMQ async connection")
-            await cls.async_connection.close()
-            cls.async_connection = None
-
-    @classmethod
-    def reconnect(cls) -> None:
-        logger.debug("Reconnecting to RabbitMQ")
-        cls.sync_connection = _create_sync_connection()
-
-        cls.create_channel()
-
-    @classmethod
-    async def reconnect_async(cls) -> None:
-        logger.debug("Reconnecting to RabbitMQ")
-        await cls.close_async()
-        await cls.create_async_connection()
-        await cls.create_async_channel()
-
-    @classmethod
-    def create_channel(cls) -> BlockingChannel:
-        with RabbitMQConnectionManager.channel_mutex:
-            if (
-                RabbitMQConnectionManager.sync_channel is None
-                or RabbitMQConnectionManager.sync_channel.is_closed
-            ):
-                logger.debug("Creating new channel")
-                RabbitMQConnectionManager.create_connection()
-                RabbitMQConnectionManager.sync_channel = (
-                    RabbitMQConnectionManager.sync_connection.channel()
-                )
-
-        return RabbitMQConnectionManager.sync_channel
-
-    @classmethod
-    async def create_async_channel(
-        cls, publisher_confirms: bool = True
-    ) -> AbstractRobustChannel:
-        async with RabbitMQConnectionManager.channel_sem:
-            if (
-                RabbitMQConnectionManager.async_channel is None
-                or RabbitMQConnectionManager.async_channel.is_closed
-            ):
-                logger.debug("Creating new channel")
-                await RabbitMQConnectionManager.create_async_connection()
-                RabbitMQConnectionManager.async_channel = (
-                    await RabbitMQConnectionManager.async_connection.channel(
-                        publisher_confirms=publisher_confirms
-                    )
-                )
-
-        return RabbitMQConnectionManager.async_channel
-
-    @classmethod
-    def close_channel(cls) -> None:
-        try:
-            if cls.sync_channel and cls.sync_channel.is_open:
-                logger.debug("Closing RabbitMQ channel")
-                cls.sync_channel.close()
-                cls.sync_channel = None
-        except:  # noqa
-            pass
-
-    @classmethod
-    async def close_async_channel(cls) -> None:
-        logger.debug("Closing RabbitMQ async channel")
-        if cls.async_channel and not cls.async_channel.is_closed:
-            await cls.async_channel.close()
-            cls.async_channel = None
 
 
 class RabbitMQ(AbstractContextManager):
     declared_exchanges: list[str] = [""]
     declared_queues: list[str] = []
+    scheduler: BrokerWrapper
 
     def __init__(self) -> None:
         self.sync_channel: Optional[BlockingChannel] = None
@@ -280,7 +169,7 @@ class RabbitMQ(AbstractContextManager):
             routing_key=queue,
             body=body,
             mandatory=True,
-            properties=pika.BasicProperties(
+            properties=BasicProperties(
                 content_type="text/plain",
                 content_encoding="utf-8",
                 expiration=expiration,
@@ -311,7 +200,7 @@ class RabbitMQ(AbstractContextManager):
 
             except Exception as e:
                 logger.exception("Error during getting message: %s", e)
-            time.sleep(0.2)
+            sleep(0.2)
         return None
 
     async def get_async(
@@ -405,9 +294,9 @@ class RabbitMQ(AbstractContextManager):
         if timeout:
             t = Thread(target=start_consuming, daemon=True)
             t.start()
-            start_time = time.time()
-            while time.time() - start_time < timeout:
-                time.sleep(0.2)
+            start_time = time()
+            while time() - start_time < timeout:
+                sleep(0.2)
             self.sync_channel.connection.add_callback_threadsafe(
                 lambda: self.sync_channel.stop_consuming(consumer_tag=consumer_tag)
             )
@@ -425,72 +314,242 @@ class RabbitMQ(AbstractContextManager):
         await RabbitMQConnectionManager.close_async()
 
 
-def _create_sync_connection(
-    connection_name: Optional[str] = None,
-) -> BlockingConnection:
-    base_args = {
-        "host": settings.rabbit_mq.dsn.host,
-        "port": settings.rabbit_mq.dsn.port,
-        "virtual_host": settings.rabbit_mq.virtual_host,
-        "connection_attempts": 3,
-        "retry_delay": 5,
-        "socket_timeout": 5,
-        "stack_timeout": 5,
-        "heartbeat": 60,
-        "channel_max": 20,
-        "client_properties": {
-            "connection_name": connection_name or "python-sdk",
-        },
-    }
+@singleton
+class RabbitMQConnectionManager:
+    sync_connection: Optional[BlockingConnection] = None
+    sync_channel: Optional[BlockingChannel] = None
+    async_connection: Optional[AbstractRobustConnection] = None
+    async_channel: Optional[AbstractRobustChannel] = None
+    connection_mutex: Lock = Lock()
+    channel_mutex: Lock = Lock()
+    connection_sem: Semaphore = Semaphore(1)
+    channel_sem: Semaphore = Semaphore(1)
+    router: RabbitRouter = None
+    broker: RB = None
+    scheduler: BrokerWrapper = None
 
-    conn_params = (
-        pika.ConnectionParameters(
-            **base_args,
-            ssl_options=SSLOptions(create_ssl_context(), settings.rabbit_mq.dsn.host),
-            client_properties={
-                **base_args["client_properties"],
-                "auth": "EXTERNAL",
-            },
-        )
-        if settings.rabbit_mq.use_ssl
-        else pika.ConnectionParameters(
-            **base_args,
-            credentials=pika.PlainCredentials(
-                settings.rabbit_mq.dsn.username,
-                settings.rabbit_mq.dsn.password,
-            ),
-        )
-    )
+    def __init__(self):
+        self.sync_connection = RabbitMQConnectionManager.create_connection()
 
-    return BlockingConnection(parameters=conn_params)
+    @classmethod
+    def create_connection(cls) -> BlockingConnection:
+        with RabbitMQConnectionManager.connection_mutex:
+            if RabbitMQConnectionManager.sync_connection is None:
+                logger.debug("Connecting to RabbitMQ")
+                RabbitMQConnectionManager.sync_connection = _create_sync_connection()
 
+        return RabbitMQConnectionManager.sync_connection
 
-async def _create_async_connection(
-    connection_name: Optional[str] = None,
-) -> AbstractRobustConnection:
-    basic_params = {
-        "virtual_host": settings.rabbit_mq.virtual_host,
-        "channel_max": 20,
-        "client_properties": {
-            "connection_name": connection_name or "python-sdk",
-            "auth": "PLAIN",
-        },
-    }
+    @classmethod
+    async def create_async_connection(cls) -> AbstractRobustConnection:
+        async with RabbitMQConnectionManager.connection_sem:
+            if RabbitMQConnectionManager.async_connection is None:
+                logger.debug("Connecting to RabbitMQ")
+                RabbitMQConnectionManager.async_connection = (
+                    await _create_async_connection()
+                )
+        return RabbitMQConnectionManager.async_connection
 
-    if settings.rabbit_mq.use_ssl:
-        conn_params = {
-            "host": settings.rabbit_mq.dsn.host,
-            "port": settings.rabbit_mq.dsn.port,
-            "ssl_context": create_ssl_context(),
-            **basic_params,
-        }
-        conn_params["client_properties"]["auth"] = "EXTERNAL"
-        return await connect_robust(**conn_params, login="", password="")
-    else:
-        return await connect_robust(
-            str(settings.rabbit_mq.url),
-            **basic_params,
-        )
+    @classmethod
+    def close(cls) -> None:
+        try:
+            if cls.sync_connection and cls.sync_connection.is_open:
+                cls.close_channel()
+                logger.debug("Closing RabbitMQ connection")
+                cls.sync_connection.close()
+                cls.sync_connection = None
+        except:  # noqa
+            pass
+
+    @classmethod
+    async def close_async(cls) -> None:
+        if cls.async_connection and not cls.async_connection.is_closed:
+            await cls.close_async_channel()
+            logger.debug("Closing RabbitMQ async connection")
+            await cls.async_connection.close()
+            cls.async_connection = None
+
+        if cls.scheduler is not None and (
+            cls.scheduler.is_worker_process or cls.scheduler.is_scheduler_process
+        ):
+            await cls.scheduler.shutdown()
+        if cls.router is not None and cls.router.broker.running:
+            await cls.router.broker.close()
+
+        if cls.broker is not None and cls.broker.running:
+            await cls.broker.close()
+
+    @classmethod
+    def reconnect(cls) -> None:
+        logger.debug("Reconnecting to RabbitMQ")
+        cls.sync_connection = _create_sync_connection()
+
+        cls.create_channel()
+
+    @classmethod
+    async def reconnect_async(cls) -> None:
+        logger.debug("Reconnecting to RabbitMQ")
+        await cls.close_async()
+        await cls.create_async_connection()
+        await cls.create_async_channel()
+
+    @classmethod
+    def create_channel(cls) -> BlockingChannel:
+        with RabbitMQConnectionManager.channel_mutex:
+            if (
+                RabbitMQConnectionManager.sync_channel is None
+                or RabbitMQConnectionManager.sync_channel.is_closed
+            ):
+                logger.debug("Creating new channel")
+                RabbitMQConnectionManager.create_connection()
+                RabbitMQConnectionManager.sync_channel = (
+                    RabbitMQConnectionManager.sync_connection.channel()
+                )
+
+        return RabbitMQConnectionManager.sync_channel
+
+    @classmethod
+    async def create_async_channel(
+        cls, publisher_confirms: bool = True
+    ) -> AbstractRobustChannel:
+        async with RabbitMQConnectionManager.channel_sem:
+            if (
+                RabbitMQConnectionManager.async_channel is None
+                or RabbitMQConnectionManager.async_channel.is_closed
+            ):
+                logger.debug("Creating new channel")
+                await RabbitMQConnectionManager.create_async_connection()
+                RabbitMQConnectionManager.async_channel = (
+                    await RabbitMQConnectionManager.async_connection.channel(
+                        publisher_confirms=publisher_confirms
+                    )
+                )
+
+        return RabbitMQConnectionManager.async_channel
+
+    @classmethod
+    def close_channel(cls) -> None:
+        try:
+            if cls.sync_channel and cls.sync_channel.is_open:
+                logger.debug("Closing RabbitMQ channel")
+                cls.sync_channel.close()
+                cls.sync_channel = None
+        except:  # noqa
+            pass
+
+    @classmethod
+    async def close_async_channel(cls) -> None:
+        logger.debug("Closing RabbitMQ async channel")
+        if cls.async_channel and not cls.async_channel.is_closed:
+            await cls.async_channel.close()
+            cls.async_channel = None
+
+    @classmethod
+    def get_router(
+        cls,
+        connection_name: Optional[str] = None,
+        schema_url: str = "/",
+        include_in_schema: bool = True,
+        prefix: str = "/messaging",
+        tags: Optional[Collection[str]] = None,
+        description: Optional[str] = None,
+        max_consumers: int = 5,
+    ) -> RabbitRouter:
+        with RabbitMQConnectionManager.connection_mutex:
+            if not cls.router:
+                max_consumers = max_consumers or 5
+                base_args = {
+                    "schema_url": schema_url,
+                    "include_in_schema": include_in_schema,
+                    "log_level": logging.DEBUG,
+                    "reconnect_interval": 0.5,
+                    "publisher_confirms": False,
+                    "prefix": prefix,
+                    "tags": tags or ["messaging"],
+                    "description": description,
+                    "max_consumers": max_consumers,
+                }
+                connection_name = connection_name or "buzzerpy-router"
+                cls.router = (
+                    RabbitRouter(
+                        host=settings.rabbit_mq.dsn.host,
+                        port=settings.rabbit_mq.dsn.port,
+                        security=BaseSecurity(
+                            ssl_context=create_ssl_context(), use_ssl=True
+                        ),
+                        client_properties={
+                            "connection_name": connection_name,
+                            "auth": "EXTERNAL",
+                        },
+                        **base_args,
+                    )
+                    if settings.rabbit_mq.use_ssl
+                    else RabbitRouter(
+                        url=settings.rabbit_mq.url,
+                        client_properties={
+                            "connection_name": connection_name,
+                        },
+                        **base_args,
+                    )
+                )
+        return cls.router
+
+    @classmethod
+    def get_broker(
+        cls,
+        connection_name: Optional[str] = None,
+        max_consumers: int = 5,
+    ) -> RB:
+        with RabbitMQConnectionManager.connection_mutex:
+            if cls.broker is not None:
+                return cls.broker
+            if cls.router is not None:
+                cls.broker = cls.router.broker
+            else:
+                max_consumers = max_consumers or 5
+                base_args = {
+                    "log_level": logging.DEBUG,
+                    "reconnect_interval": 0.5,
+                    "publisher_confirms": False,
+                    "max_consumers": max_consumers,
+                }
+                connection_name = connection_name or "buzzerpy-router"
+                cls.broker = (
+                    RB(
+                        host=settings.rabbit_mq.dsn.host,
+                        port=settings.rabbit_mq.dsn.port,
+                        security=BaseSecurity(
+                            ssl_context=create_ssl_context(), use_ssl=True
+                        ),
+                        client_properties={
+                            "connection_name": connection_name,
+                            "auth": "EXTERNAL",
+                        },
+                        **base_args,
+                    )
+                    if settings.rabbit_mq.use_ssl
+                    else RB(
+                        url=settings.rabbit_mq.url,
+                        client_properties={
+                            "connection_name": connection_name,
+                        },
+                        **base_args,
+                    )
+                )
+        return cls.broker
+
+    @classmethod
+    def get_scheduler(
+        cls,
+        connection_name: Optional[str] = None,
+        max_consumers: int = 5,
+    ) -> BrokerWrapper:
+        if cls.scheduler is None:
+            broker = cls.broker or cls.get_broker(
+                connection_name=connection_name, max_consumers=max_consumers
+            )
+            cls.scheduler = BrokerWrapper(broker)
+        return cls.scheduler
 
 
 @cache
@@ -510,3 +569,64 @@ def create_ssl_context() -> SSLContext:
     )
 
     return context
+
+
+def _create_sync_connection(
+    connection_name: Optional[str] = None,
+) -> BlockingConnection:
+    basic_params = {
+        "virtual_host": settings.rabbit_mq.virtual_host,
+        "connection_attempts": 3,
+        "retry_delay": 5,
+        "socket_timeout": 5,
+        "stack_timeout": 5,
+        "heartbeat": 60,
+        "channel_max": 20,
+        "client_properties": {
+            "connection_name": connection_name or "buzzerpy-sync",
+        },
+    }
+
+    if settings.rabbit_mq.use_ssl:
+        conn_params = ConnectionParameters(
+            host=settings.rabbit_mq.dsn.host,
+            port=settings.rabbit_mq.dsn.port,
+            ssl_options=SSLOptions(create_ssl_context(), settings.rabbit_mq.dsn.host),
+            credentials=ExternalCredentials(),
+            **basic_params,
+        )
+    else:
+        conn_params = ConnectionParameters(
+            str(settings.rabbit_mq.url),
+            **basic_params,
+        )
+
+    return BlockingConnection(parameters=conn_params)
+
+
+async def _create_async_connection(
+    connection_name: Optional[str] = None,
+) -> AbstractRobustConnection:
+    basic_params = {
+        "virtual_host": settings.rabbit_mq.virtual_host,
+        "channel_max": 20,
+        "client_properties": {
+            "connection_name": connection_name or "buzzerpy-async",
+            "auth": "PLAIN",
+        },
+    }
+
+    if settings.rabbit_mq.use_ssl:
+        conn_params = {
+            "host": settings.rabbit_mq.dsn.host,
+            "port": settings.rabbit_mq.dsn.port,
+            "ssl_context": create_ssl_context(),
+            **basic_params,
+        }
+        conn_params["client_properties"]["auth"] = "EXTERNAL"
+        return await connect_robust(**conn_params, login="", password="")
+    else:
+        return await connect_robust(
+            str(settings.rabbit_mq.url),
+            **basic_params,
+        )

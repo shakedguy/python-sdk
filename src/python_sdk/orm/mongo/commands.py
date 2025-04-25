@@ -1,9 +1,12 @@
 from collections.abc import Collection
 from typing import (
     Any,
+    Iterable,
     Literal,
     Mapping,
     Optional,
+    Self,
+    Sequence,
     TypeVar,
     Union,
 )
@@ -11,22 +14,87 @@ from typing import (
 from bson.objectid import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 from py_cachify import lock
-from pydantic import BaseModel
-from pymongo import ReturnDocument
+from pymongo import ReplaceOne, ReturnDocument, UpdateOne
+from pymongo.results import BulkWriteResult
 
 from ...errors import ConcurrencyError, NotExistsError
-from ...infrastructure.db import Mongo
-from ...utils import DateTime
-from ..models import DocumentID
+from ...infrastructure.db import Mongo, MongoCollection
+from ...utils import DateTime, Strings
+from ..models.fields import DocumentID
+from .base_document import BaseDocument
 
-DocumentType = TypeVar("DocumentType", bound=BaseModel)
+DocumentType = TypeVar("DocumentType", bound=BaseDocument)
 
 VersionCheckResult = Literal["valid", "not exist", "version mismatch"]
 
+ReplaceOneItem = tuple[Mapping[str, Any], Union[Mapping[str, Any], DocumentType]]
 
-class MongoCommandsMixin:
+
+class MongoCommandsMixin(BaseDocument):
+    @classmethod
+    def get_collection_name(cls) -> str:
+        return getattr(cls.Meta, "collection_name", None) or Strings.to_snake_case(  # noqa
+            Strings.to_plural(cls.__name__)
+        )
+
+    @classmethod
+    def replace_one(
+        cls, match: Mapping[str, Any], replacement: Mapping[str, Any]
+    ) -> Optional[Self]:
+        with MongoCollection(name=cls.get_collection_name()) as collection:
+            replaced = collection.find_one_and_replace(
+                filter=match,
+                replacement=replacement,
+                upsert=True,
+                return_document=ReturnDocument.AFTER,
+            )
+            replaced["id"] = str(replaced.get("id", None) or replaced.get("_id", None))
+
+            return cls.model_validate(replaced) if replaced else None
+
+    @classmethod
+    async def replace_one_async(
+        cls,
+        match: Mapping[str, Any],
+        replacement: Union[Mapping[str, Any], DocumentType],
+    ) -> Optional[Self]:
+        async with MongoCollection(name=cls.get_collection_name()) as collection:
+            replaced = await collection.find_one_and_replace(
+                filter=match,
+                replacement=replacement.model_dump()
+                if isinstance(replacement, BaseDocument)
+                else replacement,
+                upsert=True,
+                return_document=ReturnDocument.AFTER,
+            )
+            replaced["id"] = str(replaced.get("id", None) or replaced.get("_id", None))
+
+            return cls.model_validate(replaced) if replaced else None
+
+    @classmethod
+    def replace_many(
+        cls,
+        requests: Iterable[ReplaceOneItem],
+    ) -> BulkWriteResult:
+        with MongoCollection(name=cls.get_collection_name()) as collection:
+            return collection.bulk_write(
+                requests=cls._create_bulk_replace(requests),
+            )
+
+    @classmethod
+    async def replace_many_async(
+        cls, requests: Iterable[ReplaceOneItem]
+    ) -> BulkWriteResult:
+        async with MongoCollection(name=cls.get_collection_name()) as collection:
+            return await collection.bulk_write(
+                requests=cls._create_bulk_replace(requests),
+            )
+
     def save(self) -> None:
-        created = self.create(self)
+        _id = getattr(self, "id", None)
+        created = (  # noqa
+            self.update(_id, self) if _id is not None else self.create(self)
+        )
 
         if created is not None:
             for key, value in vars(created).items():
@@ -35,7 +103,12 @@ class MongoCommandsMixin:
                 setattr(self, key, value)
 
     async def save_async(self) -> None:
-        created = await self.create_async(self)
+        _id = getattr(self, "id", None)
+        created = (  # noqa
+            await self.update_async(_id, self)
+            if _id is not None
+            else await self.create_async(self)
+        )
         if created is not None:
             for key, value in vars(created).items():
                 if isinstance(value, ObjectId):
@@ -43,7 +116,7 @@ class MongoCommandsMixin:
                 setattr(self, key, value)
 
     @classmethod
-    def create(cls, entity: DocumentType) -> Optional[DocumentType]:
+    def create(cls, entity: DocumentType) -> Optional[Self]:
         if not entity:
             return None
         entity = cls.model_validate(entity)
@@ -67,7 +140,7 @@ class MongoCommandsMixin:
             return cls.model_validate(created) if created else None
 
     @classmethod
-    async def create_async(cls, entity: DocumentType) -> Optional[DocumentType]:
+    async def create_async(cls, entity: DocumentType) -> Optional[Self]:
         if not entity:
             return None
         entity = cls.model_validate(entity)
@@ -92,21 +165,22 @@ class MongoCommandsMixin:
     @classmethod
     def update(
         cls, pk: Union[str, DocumentID, ObjectId], entity: DocumentType
-    ) -> Optional[DocumentType]:
-        entity = cls.model_validate(entity)
+    ) -> Optional[Self]:
+        entity = cls.model_validate(entity)  # noqa
 
         data = entity.model_dump(exclude={"id"}, exclude_unset=True)
         _id = ObjectId(pk)
 
-        if "updated_at" in cls.fields:
+        if "updated_at" in cls.get_fields():
             data["updated_at"] = DateTime.now()
         data = {"$set": data}
-        with Mongo() as db:
-            collection = db.get_collection(name=cls.get_collection_name())
-            if "version" in cls.fields:
-                version = entity.version
+        with MongoCollection(name=cls.get_collection_name()) as collection:
+            if "version" in cls.get_fields():
+                version = getattr(entity, "version", None) or 1
                 version_check_result = cls.check_version(
-                    pk=pk, version=version, collection=collection
+                    pk=pk,
+                    version=version,
+                    collection=collection,  # type: ignore
                 )
                 if version_check_result == "not exist":
                     raise NotExistsError(cls.get_collection_name(), pk)
@@ -124,6 +198,18 @@ class MongoCommandsMixin:
             return cls.model_validate(updated) if updated else None
 
     @classmethod
+    def update_many(cls, operations: Sequence[UpdateOne]) -> BulkWriteResult:
+        with MongoCollection(name=cls.get_collection_name()) as collection:
+            return collection.bulk_write(operations)
+
+    @classmethod
+    async def update_many_async(
+        cls, operations: Sequence[UpdateOne]
+    ) -> BulkWriteResult:
+        async with MongoCollection(name=cls.get_collection_name()) as collection:
+            return await collection.bulk_write(operations)
+
+    @classmethod
     def check_version(
         cls,
         *,
@@ -132,10 +218,10 @@ class MongoCommandsMixin:
         collection: Optional[Collection[Mapping[str, Any]]] = None,
     ) -> VersionCheckResult:
         def _check_version(
-            _collection: Collection,
+            coll: Collection[Mapping[str, Any]],
         ) -> VersionCheckResult:
             with lock(f"mongo:{cls.get_collection_name()}:{pk}"):
-                doc = _collection.find_one({"_id": ObjectId(pk)})
+                doc = coll.find_one({"_id": ObjectId(pk)})  # type: ignore
                 if not doc:
                     return "not exist"
                 return (
@@ -145,7 +231,7 @@ class MongoCommandsMixin:
         if collection is None:
             with Mongo() as db:
                 collection = db.get_collection(name=cls.get_collection_name())
-                return _check_version(collection)
+                return _check_version(collection)  # type: ignore
         return _check_version(collection)
 
     @classmethod
@@ -168,29 +254,27 @@ class MongoCommandsMixin:
                 )
 
         if collection is None:
-            async with Mongo() as db:
-                collection = db.get_collection(name=cls.get_collection_name())
+            async with MongoCollection(name=cls.get_collection_name()) as collection:
                 return await _check_version(collection)
         return await _check_version(collection)
 
     @classmethod
     async def update_async(
         cls, pk: Union[str, DocumentID, ObjectId], entity: DocumentType
-    ) -> Optional[DocumentType]:
+    ) -> Optional[Self]:
         if not entity:
             return None
-        entity = cls.model_validate(entity)
+        entity = cls.model_validate(entity)  # noqa
 
         data = entity.model_dump(exclude={"id"}, exclude_unset=True)
         _id = ObjectId(pk)
 
-        if "updated_at" in cls.fields:
+        if "updated_at" in cls.get_fields():
             data["updated_at"] = DateTime.now()
         data = {"$set": data}
-        async with Mongo() as db:
-            collection = db.get_collection(name=cls.get_collection_name())
-            if "version" in cls.fields:
-                version = entity.version
+        async with MongoCollection(name=cls.get_collection_name()) as collection:
+            if "version" in cls.get_fields():
+                version = getattr(entity, "version", None) or 1
                 version_check_result = await cls.check_version_async(
                     pk=pk, version=version, collection=collection
                 )
@@ -211,32 +295,64 @@ class MongoCommandsMixin:
 
     @classmethod
     def delete(cls, pk: Union[str, DocumentID, ObjectId]) -> int:
-        with Mongo() as db:
-            collection = db.get_collection(name=cls.get_collection_name())
+        with MongoCollection(name=cls.get_collection_name()) as collection:
             result = collection.delete_one({"_id": ObjectId(pk)})
 
             return result.deleted_count if result else 0
 
     @classmethod
     def delete_all(cls) -> int:
-        with Mongo() as db:
-            collection = db.get_collection(name=cls.get_collection_name())
+        with MongoCollection(name=cls.get_collection_name()) as collection:
             result = collection.delete_many({})
 
             return result.deleted_count if result else 0
 
     @classmethod
     async def delete_async(cls, pk: Union[str, DocumentID, ObjectId]) -> int:
-        async with Mongo() as db:
-            collection = db.get_collection(name=cls.get_collection_name())
+        async with MongoCollection(name=cls.get_collection_name()) as collection:
             result = await collection.delete_one({"_id": ObjectId(pk)})
 
             return result.deleted_count if result else 0
 
     @classmethod
     async def delete_all_async(cls) -> int:
-        async with Mongo() as db:
-            collection = db.get_collection(name=cls.get_collection_name())
+        async with MongoCollection(name=cls.get_collection_name()) as collection:
             result = await collection.delete_many({})
 
             return result.deleted_count if result else 0
+
+    @classmethod
+    def delete_many(cls, **kwargs) -> int:
+        from .queries import MongoQueriesMixin
+
+        fltr = MongoQueriesMixin._build_filter(**kwargs)  # noqa
+        with MongoCollection(name=cls.get_collection_name()) as collection:
+            result = collection.delete_many(fltr)
+
+            return result.deleted_count if result else 0
+
+    @classmethod
+    async def delete_many_async(cls, **kwargs) -> int:
+        from .queries import MongoQueriesMixin
+
+        fltr = MongoQueriesMixin._build_filter(**kwargs)  # noqa
+        async with MongoCollection(name=cls.get_collection_name()) as collection:
+            result = await collection.delete_many(fltr)
+
+            return result.deleted_count if result else 0
+
+    @classmethod
+    def _create_bulk_replace(
+        cls,
+        requests: Iterable[ReplaceOneItem],
+    ) -> list[ReplaceOne]:
+        return [
+            ReplaceOne(
+                filter=match,
+                replacement=replacement.model_dump()
+                if isinstance(replacement, BaseDocument)
+                else replacement,
+                upsert=True,
+            )
+            for match, replacement in requests
+        ]

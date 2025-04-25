@@ -1,7 +1,7 @@
-import copy
 import re
 from typing import Any, Union
 
+import pydash as _
 from jinja2 import Template
 
 from ..conf import constants
@@ -58,15 +58,15 @@ def render_template(template: str, **kwargs) -> str:
 def get_value_from_path(input_data: dict[str, Any], path: str) -> Any:
     keys = re.sub(r"\[(\d+)]", r".\1", path).split(".")
     keys = [k for k in keys if len(str(k).strip())]
-    current: Union[dict[str, Any], list[Any]] = copy.deepcopy(input_data)
+    current: Union[dict[str, Any], list[Any]] = _.clone_deep(input_data)
 
     for key in keys:
-        if isinstance(current, dict):
+        if _.is_dict(current):
             found_key = next(
-                (k for k in current.keys() if str(k).lower() == str(key).lower()), None
+                (k for k in _.keys(current) if str(k).lower() == str(key).lower()), None
             )
             current = current.get(found_key) if found_key is not None else None
-        elif isinstance(current, list) and key.isdigit():
+        elif _.is_list(current) and key.isdigit():
             current = current[int(key)]
         else:
             return None

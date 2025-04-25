@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Collection
-from typing import override
+from typing import Collection, Optional, Type, override
 
 from pydantic import (
     AliasChoices,
@@ -11,10 +10,11 @@ from pydantic import (
 )
 
 from ... import errors
-from ...utils import DateTime
-from ..models import BaseModel, DateTimeField, DocumentIDField
+from ...infrastructure.db import Mongo, MongoCollection
+from ...utils import DateTime, find_subclasses
+from ..models.fields import DateTimeField, DocumentIDField
+from .base_document import DocumentIndex, DocumentIndexType
 from .commands import MongoCommandsMixin
-from .indexes import DocumentIndex, DocumentIndexType
 from .queries import MongoQueriesMixin
 
 VERSION_INDEX = DocumentIndex(
@@ -24,7 +24,7 @@ VERSION_INDEX = DocumentIndex(
 )
 
 
-class DocumentModel(BaseModel, MongoQueriesMixin, MongoCommandsMixin):
+class Document(MongoQueriesMixin, MongoCommandsMixin):
     id: DocumentIDField = Field(
         default=None,
         title="Id",
@@ -32,96 +32,210 @@ class DocumentModel(BaseModel, MongoQueriesMixin, MongoCommandsMixin):
         validation_alias=AliasChoices("_id", "id"),
     )
 
-    version: PositiveInt = Field(
-        default=1,
-        title="Version",
-        description="The version of the record.",
-        validation_alias=AliasChoices("version", "_version", "__v"),
-    )
+    @staticmethod
+    def get_all_documents() -> Collection[Type[Document]]:
+        all_models = find_subclasses(Document)
 
-    class Meta:
-        collection_name: str = ""
-        indexes: Collection[DocumentIndex] = list()
+        exclude = [
+            Document,
+            DocumentVersionModel,
+            DocumentTimeStampedModel,
+            DocumentTimeStampedVersionedModel,
+        ]
+        return [m for m in all_models if issubclass(m, Document) and m not in exclude]
 
     @classmethod
     def get_indexes(cls) -> Collection[DocumentIndex]:
-        return (
-            list()
-            if cls.__name__ in ["DocumentTimeStampedModel"]
-            else [VERSION_INDEX] + [idx for idx in getattr(cls.Meta, "indexes", [])]
-        )
+        return getattr(cls.Meta, "indexes", list())
+
+    @property
+    def pk(self) -> Optional[str]:
+        return str(self.id) if self.id else None
+
+    def before_update(self) -> None:
+        pass
+
+    def before_insert(self) -> None:
+        self.id = None
+
+    async def before_update_async(self) -> None:
+        pass
+
+    async def before_insert_async(self) -> None:
+        await asyncio.sleep(0)
+        self.id = None
 
     def refresh_from_db(self) -> None:
         if self.id is None:
             raise errors.NoIdError(self.get_collection_name())
-        from ...infrastructure.db import Mongo
 
-        with Mongo() as db:
-            record = db[self.get_collection_name()].find_one({"_id": self.id})
-            if record is None:
-                raise errors.NotExistsError(self.get_collection_name(), self.id)
+        record = self.find_by_pk(self.id)
         for k, v in record.items():
             setattr(self, k, v)
 
     async def refresh_from_db_async(self) -> None:
         if self.id is None:
             raise errors.NoIdError(self.get_collection_name())
-        from ...infrastructure.db import Mongo
-
-        async with Mongo() as db:
-            record = await db[self.get_collection_name()].find_one({"_id": self.id})
-            if record is None:
-                raise errors.NotExistsError(self.get_collection_name(), self.id)
+        record = await self.find_by_pk_async(self.id)
         for k, v in record.items():
             setattr(self, k, v)
 
+    @classmethod
+    async def create_indexes_async(cls) -> None:
+        indexes = cls.get_indexes()
+        if not len(indexes or []):
+            return
+
+        async with MongoCollection(cls.get_collection_name()) as coll:
+            await asyncio.gather(
+                *[
+                    coll.create_index(
+                        name=index.name,
+                        keys=index.pymongo_keys,
+                        unique=index.unique,
+                        background=index.background,
+                    )
+                    for index in indexes
+                ]
+            )
+
+    @classmethod
+    def create_indexes(cls) -> None:
+        indexes = cls.get_indexes()
+        if not len(indexes or []):
+            return
+        with MongoCollection(cls.get_collection_name()) as coll:
+            for index in indexes:
+                coll.create_index(
+                    name=index.name,
+                    keys=index.pymongo_keys,
+                    unique=index.unique,
+                    background=index.background,
+                )
+
+
+class DocumentVersionModel(Document):
+    version: PositiveInt = Field(
+        default=1,
+        title="Version",
+        description="The version of the record.",
+        validation_alias=AliasChoices("version", "_version", "v", "__v"),
+    )
+
     def before_update(self) -> None:
+        super().before_update()
         self.version += 1
 
     def before_insert(self) -> None:
+        super().before_insert()
         self.version = 1
-        self.id = None
 
     async def before_update_async(self) -> None:
-        await asyncio.sleep(0)
+        await super().before_update_async()
         self.version += 1
 
     async def before_insert_async(self) -> None:
-        await asyncio.sleep(0)
+        await super().before_insert_async()
         self.version = 1
-        self.id = None
+
+    @classmethod
+    def get_indexes(cls) -> Collection[DocumentIndex]:
+        return [VERSION_INDEX]
 
 
-class DocumentTimeStampedModel(DocumentModel):
+class DocumentTimeStampedModel(Document):
     created_at: DateTimeField = Field(
-        default=DateTime.now(),
+        default_factory=DateTime.now,
         title="Created At",
         description="The date and time the record was created.",
-        validation_alias=AliasChoices("created_at", "createdAt"),
     )
     updated_at: DateTimeField = Field(
-        default=DateTime.now(),
+        default_factory=DateTime.now,
         title="Updated At",
         description="The date and time the record was last updated.",
-        validation_alias=AliasChoices("updated_at", "updatedAt"),
     )
 
-    @override
+    @override  # noqa
     def before_update(self) -> None:
         super().before_update()
         self.updated_at = DateTime.now()
 
-    @override
+    @override  # noqa
     def before_insert(self) -> None:
         super().before_insert()
         self.created_at = DateTime.now()
 
-    @override
+    @override  # noqa
     async def before_update_async(self) -> None:
         await super().before_update_async()
         self.updated_at = DateTime.now()
 
-    @override
+    @override  # noqa
     async def before_insert_async(self) -> None:
         await super().before_insert_async()
         self.created_at = DateTime.now()
+
+
+class DocumentTimeStampedVersionedModel(DocumentVersionModel, DocumentTimeStampedModel):
+    pass
+
+
+class View(MongoQueriesMixin):
+    class Meta:
+        collection_name: str = ""
+        source: str = ""
+        pipeline: Collection[dict[str, str]] = list()
+
+    @staticmethod
+    def get_all_views() -> Collection[Type[View]]:
+        return find_subclasses(View)
+
+    @classmethod
+    def get_pipeline(cls) -> Collection[dict[str, str]]:
+        return getattr(cls.Meta, "pipeline", None) or []
+
+    @classmethod
+    def get_source(cls) -> str:
+        return getattr(cls.Meta, "source", None) or ""
+
+    @classmethod
+    async def create_async(cls) -> None:
+        collection_name, source, pipline = cls._build_create()
+
+        async with Mongo() as db:
+            await db.command(
+                {
+                    "create": collection_name,
+                    "viewOn": source,
+                    "pipeline": pipline,
+                }
+            )
+
+    @classmethod
+    def create(cls) -> None:
+        collection_name, source, pipline = cls._build_create()
+
+        with Mongo() as db:
+            db.command(
+                {
+                    "create": collection_name,
+                    "viewOn": source,
+                    "pipeline": pipline,
+                }
+            )
+
+    @classmethod
+    def _build_create(cls) -> tuple[str, str, Collection[dict[str, str]]]:
+        pipline = cls.get_pipeline()
+        collection_name = cls.get_collection_name()
+        source = cls.get_source()
+        if not len(pipline or []):
+            raise RuntimeError(f"Pipeline is not set for mongo view {cls.__name__}")
+        if not collection_name:
+            raise RuntimeError(
+                f"Collection name is not set for mongo view {cls.__name__}"
+            )
+        if not source:
+            raise RuntimeError(f"Source is not set for mongo view {cls.__name__}")
+
+        return collection_name, source, pipline

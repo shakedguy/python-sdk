@@ -11,3 +11,4 @@ wheels/
 tmp.py
 .env
 .idea/
+*.code-workspace

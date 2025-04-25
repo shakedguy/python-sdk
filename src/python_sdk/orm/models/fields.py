@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Annotated, Any, Optional, TypeVar, Union
+from uuid import UUID
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -11,7 +10,6 @@ from pydantic import (
     GetJsonSchemaHandler,
     JsonValue,
     PlainSerializer,
-    PositiveInt,
 )
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema, core_schema, from_json
@@ -19,7 +17,7 @@ from pydantic_core.core_schema import (
     ValidationInfo,
 )
 
-from ...utils import Crypto, DateTime, Strings
+from ...utils import Crypto, DateTime
 
 T = TypeVar("T")
 
@@ -42,11 +40,35 @@ JSONPayload = Union[JSONObject | JSONArray]
 
 DateTimeField: Optional[datetime] = Annotated[
     Optional[datetime],
-    BeforeValidator(lambda x: DateTime.to_app_timezone(x) if x else None),
+    BeforeValidator(lambda x: DateTime.to_datetime(x) if x else None),
 ]
 
-EntityIdField: PositiveInt = Annotated[
-    PositiveInt, BeforeValidator(lambda x: int(x) if x else None)
+DateTimeISOStrField: str = Annotated[
+    Optional[str],
+    BeforeValidator(
+        lambda x: DateTime.to_datetime(x).isoformat() if x else DateTime.iso_now()
+    ),
+]
+
+DateOnlyStrField: Optional[str] = Annotated[
+    Optional[str],
+    BeforeValidator(
+        lambda x: DateTime.to_date_only(x).strftime("%Y-%m-%d") if x else None
+    ),
+]
+
+TimeOnlyStrField: Optional[str] = Annotated[
+    Optional[str],
+    BeforeValidator(
+        lambda x: DateTime.to_time_only(x).strftime("%H:%M:%S") if x else None
+    ),
+]
+
+EntityIDField: Optional[int] = Annotated[
+    Optional[int], BeforeValidator(lambda x: int(x) if x else None)
+]
+FloatField: Optional[float] = Annotated[
+    Optional[float], BeforeValidator(lambda x: float(x) if x else None)
 ]
 
 
@@ -60,9 +82,14 @@ def _parse_json_field(value: Any) -> JsonValue:
     return value
 
 
-JsonObjectField: Optional[dict[str, Any]] = Annotated[
-    Optional[dict[str, Any]],
+JsonObjectField: Optional[JSONObject] = Annotated[
+    Optional[JSONObject],
     BeforeValidator(_parse_json_field),
+]
+
+ChannelVersionsField: dict[str, Union[str, int, float]] = Annotated[
+    Optional[dict[str, Union[str, int, float]]],
+    BeforeValidator(lambda x: dict(x) if x else dict()),
 ]
 
 JsonArrayField: Optional[list[dict[str, Any]]] = Annotated[
@@ -76,22 +103,6 @@ JsonField: JsonValue = Annotated[JsonValue, BeforeValidator(_parse_json_field)]
 UUIDField: Optional[str] = Annotated[
     Optional[str], BeforeValidator(lambda x: str(x or Crypto.uuid7()))
 ]
-
-
-def _validate_phone_number(value: Any) -> str:
-    res = ""
-    if isinstance(value, str):
-        res = Strings.format_phone_number(value)
-    elif isinstance(value, (int, float)):
-        res = Strings.format_phone_number(str(value))
-
-    if len(res):
-        return res
-
-    raise ValueError("Invalid phone number format")
-
-
-PhoneNumberField: str = Annotated[str, BeforeValidator(_validate_phone_number)]  # type: ignore
 
 
 plain_validator = (
@@ -155,6 +166,10 @@ class DocumentID(ObjectId):
         )
         return json_schema
 
+    @staticmethod
+    def from_uuid(id_: Union[UUID, str]) -> "DocumentID":
+        return DocumentID(Crypto.to_object_id_str(id_))
+
 
 def _create_document_id(value: Any) -> Optional[DocumentID]:
     if not value:
@@ -176,8 +191,3 @@ DocumentIDField: Optional[DocumentID] = Annotated[
         func=lambda v: str(v) if v else None,
     ),
 ]
-
-# RelatedField: Optional[DocumentID] = Annotated[
-#     Optional[DocumentID],
-#     BeforeValidator(_create_document_id),
-# ]

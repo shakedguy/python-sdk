@@ -3,62 +3,54 @@ from typing import Any, LiteralString
 from pydantic import Field
 
 from ... import errors
-from ...utils import DateTime, Strings
-from ..models.fields import DateTimeField, EntityIdField
-from ..models.model import BaseModel
+from ...domain.base.fields import DateTimeField
+from ...utils import DateTime
+from .base_entity import BaseEntity
+from .commands import SQLCommandsMixin
+from .queries import SQLQueriesMixin
 
 
-class SQLModel(BaseModel):
-    id: EntityIdField = Field(
-        default=None, title="Id", description="The primary key of the table."
-    )
-
-    @classmethod
-    def get_table_name(cls) -> str:
-        return getattr(
-            cls,
-            "__tablename__",
-            Strings.to_snake_case(Strings.to_plural(cls.__name__)),
-        )
+class SQLModel(BaseEntity, SQLQueriesMixin, SQLCommandsMixin):
+    """
+    Base SQL Model class that combines entity, query, and command functionalities.
+    """
 
     def _find_by_pk_sql(self) -> tuple[LiteralString, tuple[Any]]:
-        return f"SELECT * FROM {self.get_table_name()} WHERE id = %s", (self.id,)  # type: ignore
+        """
+        Build SQL query to find a record by primary key.
+        """
+        return f"SELECT * FROM {self.get_table_name} WHERE id = %s", (self.id,)  # type: ignore
 
     def refresh_from_db(self) -> None:
+        """
+        Refresh the current instance with data from the database.
+        """
         if self.id is None:
-            raise errors.NoIdError(self.get_table_name())
+            raise errors.NoIdError(self.get_table_name)
 
-        from ...infrastructure.db import Postgres
-
-        sql, params = self._find_by_pk_sql()
-        with Postgres() as db:
-            record = db.execute(
-                sql,
-                params,
-            ).fetchone()
-            if record is None:
-                raise errors.NotExistsError(self.get_table_name(), self.id)
+        record = self.find_by_pk(self.id)
 
         for k, v in record.items():
             setattr(self, k, v)
 
     async def refresh_from_db_async(self) -> None:
+        """
+        Asynchronously refresh the current instance with data from the database.
+        """
         if self.id is None:
-            raise errors.NoIdError(self.get_table_name())
+            raise errors.NoIdError(self.get_table_name)
 
-        from ...infrastructure.db import Postgres
-
-        sql, params = self._find_by_pk_sql()
-        async with Postgres() as db:
-            record = await db.fetchrow(sql, params)
-            if record is None:
-                raise errors.NotExistsError(self.get_table_name(), self.id)
+        record = await self.find_by_pk_async(self.id)
 
         for k, v in record.items():
             setattr(self, k, v)
 
 
 class SQLTimeStampedModel(SQLModel):
+    """
+    SQL Model with timestamp fields for creation and updates.
+    """
+
     created_at: DateTimeField = Field(
         default=DateTime.now(),
         title="Created At",

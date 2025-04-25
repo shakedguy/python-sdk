@@ -1,1 +1,2 @@
-from .rabbitmq import RabbitMQ
+from .queues import *
+from .rabbitmq import *

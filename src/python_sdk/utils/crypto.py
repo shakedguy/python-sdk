@@ -2,9 +2,13 @@ import hashlib
 import os
 import random
 import secrets
+import string
 import time
 from abc import ABC
-from typing import Literal
+from typing import AnyStr, Literal, Optional, Union
+from uuid import UUID
+
+from bson.objectid import ObjectId
 
 
 class Crypto(ABC):  # noqa
@@ -15,6 +19,23 @@ class Crypto(ABC):  # noqa
     password matching, random ID generation, random token generation,
     MD5 hash calculation, and UUID version 7 generation.
     """
+
+    @classmethod
+    def to_object_id(cls, id_: Union[AnyStr, UUID, ObjectId]) -> Optional[ObjectId]:
+        if isinstance(id_, ObjectId):
+            return id_
+        if isinstance(id_, UUID):
+            return ObjectId(id_.bytes.hex()[:24])
+
+        try:
+            return ObjectId(id_)
+        except:  # noqa
+            return ObjectId(UUID(id_).bytes.hex()[:24])
+
+    @classmethod
+    def to_object_id_str(cls, id_: Union[AnyStr, UUID, ObjectId]) -> Optional[str]:
+        object_id = cls.to_object_id(id_)
+        return str(object_id) if object_id else None
 
     @classmethod
     def encrypt_password(cls, password: str, salt: str) -> str:
@@ -128,12 +149,21 @@ class Crypto(ABC):  # noqa
         Returns:
             str: The generated UUID version 7 string.
         """
-        timestamp = int(time.time() * 1000).to_bytes(6, byteorder="big")
+        timestamp = int(time.time() * 1000)
         random_bytes = os.urandom(10)
+
         uuid_bytes = (
-            timestamp
+            timestamp.to_bytes(6, byteorder="big")
             + bytes([(random_bytes[0] & 0x0F) | 0x70])
             + bytes([(random_bytes[1] & 0x3F) | 0x80])
             + random_bytes[2:]
         )
-        return uuid_bytes.hex().upper()
+
+        return "".join(f"{b:02x}" for b in uuid_bytes).upper()
+
+    @staticmethod
+    def generate_unique_secure_token(length: Optional[int] = 24) -> str:
+        length = length or 24
+        base58_alphabet = string.ascii_letters + string.digits
+        base58_alphabet = base58_alphabet.translate(str.maketrans("", "", "0OIl"))
+        return "".join(secrets.choice(base58_alphabet) for _ in range(length))
