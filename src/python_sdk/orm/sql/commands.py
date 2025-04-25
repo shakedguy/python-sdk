@@ -2,15 +2,15 @@ from typing import Any, Generic, Literal, Optional, Self, TypeVar, Union
 
 from bson.objectid import ObjectId
 
-from ...domain.base.fields import DocumentID
 from ...infrastructure.db import Postgres
 from ...utils import DateTime
+from ..models.fields import DocumentID
 from .base_entity import BaseEntity
 
 EntityType = TypeVar("EntityType", bound=BaseEntity)
 
 
-class SQLCommandsMixin(Generic[EntityType]):
+class SQLCommandsMixin(Generic[EntityType]):  # noqa
     """
     Mixin class providing SQL command functionalities for entities.
     """

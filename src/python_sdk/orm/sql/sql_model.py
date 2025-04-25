@@ -3,8 +3,8 @@ from typing import Any, LiteralString
 from pydantic import Field
 
 from ... import errors
-from ...domain.base.fields import DateTimeField
 from ...utils import DateTime
+from ..models.fields import DateTimeField
 from .base_entity import BaseEntity
 from .commands import SQLCommandsMixin
 from .queries import SQLQueriesMixin
