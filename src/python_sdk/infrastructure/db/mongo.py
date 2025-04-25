@@ -1,9 +1,15 @@
 import logging
+from contextlib import AbstractContextManager
 from threading import Lock
 from typing import Optional
 
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from motor.motor_asyncio import (
+    AsyncIOMotorClient,
+    AsyncIOMotorCollection,
+    AsyncIOMotorDatabase,
+)
 from pymongo import MongoClient as SyncMongoClient
+from pymongo.collection import Collection
 from pymongo.database import Database
 
 from ...conf.app_settings import settings
@@ -14,7 +20,7 @@ logger = get_logger("Mongo", level=logging.DEBUG)
 
 
 @singleton
-class MongoClients(object):
+class MongoClients:
     __slots__ = ()
     sync_client: Optional[SyncMongoClient] = None
     async_client: Optional[AsyncIOMotorClient] = None
@@ -32,7 +38,7 @@ class MongoClients(object):
                 cls.sync_client = SyncMongoClient(settings.mongo.url)
 
 
-class Mongo(object):
+class Mongo(AbstractContextManager):
     __slots__ = ()
 
     def __enter__(self) -> Database:
@@ -48,9 +54,34 @@ class Mongo(object):
         pass
 
     @classmethod
+    def init_clients(cls) -> None:
+        MongoClients.init_clients()
+
+    @classmethod
     def close(cls) -> None:
         logger.debug("Closing MongoDB")
         if MongoClients.async_client:
             MongoClients.async_client.close()
         if MongoClients.sync_client:
             MongoClients.sync_client.close()
+
+
+class MongoCollection(AbstractContextManager):
+    __slots__ = ("name",)
+
+    def __init__(self, name: str):
+        self.name = name
+
+    def __enter__(self) -> Collection:
+        with Mongo() as db:
+            return db.get_collection(name=self.name)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    async def __aenter__(self) -> AsyncIOMotorCollection:
+        async with Mongo() as db:
+            return db.get_collection(name=self.name)
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
