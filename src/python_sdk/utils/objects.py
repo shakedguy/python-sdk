@@ -321,7 +321,7 @@ def find_subclasses(base_class: Type[T]) -> list[Type[T]]:
     Returns:
         list: A list of all subclasses (direct and indirect)
     """
-    from .. import domain
+    from .. import orm
 
     direct_subclasses = base_class.__subclasses__()
     all_subclasses = list(direct_subclasses)
@@ -331,7 +331,7 @@ def find_subclasses(base_class: Type[T]) -> list[Type[T]]:
 
     res = list(dict.fromkeys(all_subclasses))
 
-    for item in inspect.getmembers(domain):
+    for item in inspect.getmembers(orm):
         if type(item[1]) is type and issubclass(item[1], base_class):
             res.append(item[1])
 
