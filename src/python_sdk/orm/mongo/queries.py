@@ -14,9 +14,9 @@ from bson.objectid import ObjectId
 
 from ...conf import constants
 from ...infrastructure.db import Mongo, MongoCollection
-from ...models.fields import DocumentID
 from ...utils import Strings
 from ..base import FindAsyncResult, FindResult
+from ..models.fields import DocumentID
 from .base_document import BaseDocument
 
 DocumentType = TypeVar("DocumentType", bound=BaseDocument)
