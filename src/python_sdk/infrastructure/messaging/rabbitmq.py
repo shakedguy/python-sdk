@@ -525,7 +525,7 @@ class RabbitMQConnectionManager:
                             ssl_context=create_ssl_context(), use_ssl=True
                         ),
                         client_properties={
-                            # "connection_name": connection_name,
+                            "connection_name": connection_name,
                             "auth": "EXTERNAL",
                         },
                         **base_args,
@@ -533,9 +533,10 @@ class RabbitMQConnectionManager:
                     if settings.rabbit_mq.use_ssl
                     else RB(
                         url=settings.rabbit_mq.url,
-                        # client_properties={
-                        #     "connection_name": connection_name,
-                        # },
+                        client_properties={
+                            "connection_name": connection_name,
+                            "auth": "PLAIN",
+                        },
                         **base_args,
                     )
                 )
