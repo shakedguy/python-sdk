@@ -8,7 +8,7 @@ from functools import cache
 from ssl import SSLContext
 from threading import Lock, Thread
 from time import sleep, time
-from typing import Annotated, Any, AnyStr, Callable, Optional, Self, Union
+from typing import Any, AnyStr, Callable, Optional, Self, Union
 
 from aio_pika import Message, connect_robust
 from aio_pika.abc import (
@@ -20,15 +20,15 @@ from aio_pika.abc import (
 from aio_pika.abc import (
     DeliveryMode as AioPikaDeliveryMode,
 )
-from faststream import Context
 from faststream.rabbit import RabbitBroker as RB  # noqa
-from faststream.rabbit.fastapi import RabbitMessage, RabbitRouter
+from faststream.rabbit.fastapi import RabbitRouter
 from faststream.security import BaseSecurity
 from pika import BasicProperties, BlockingConnection, ConnectionParameters, SSLOptions
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.credentials import ExternalCredentials
 from pika.delivery_mode import DeliveryMode
 from pika.exchange_type import ExchangeType
+from taskiq_faststream import BrokerWrapper
 
 from ...conf import settings
 from ...conf.logger import get_logger
@@ -43,6 +43,7 @@ logger = get_logger(name="RabbitMQ", level=logging.DEBUG)
 class RabbitMQ(AbstractContextManager):
     declared_exchanges: list[str] = [""]
     declared_queues: list[str] = []
+    scheduler: BrokerWrapper
 
     def __init__(self) -> None:
         self.sync_channel: Optional[BlockingChannel] = None
@@ -325,6 +326,7 @@ class RabbitMQConnectionManager:
     channel_sem: Semaphore = Semaphore(1)
     router: RabbitRouter = None
     broker: RB = None
+    scheduler: BrokerWrapper = None
 
     def __init__(self):
         self.sync_connection = RabbitMQConnectionManager.create_connection()
@@ -534,8 +536,20 @@ class RabbitMQConnectionManager:
                         **base_args,
                     )
                 )
-
         return cls.broker
+
+    @classmethod
+    def get_scheduler(
+        cls,
+        connection_name: Optional[str] = None,
+        max_consumers: int = 5,
+    ) -> BrokerWrapper:
+        if cls.scheduler is None:
+            broker = cls.broker or cls.get_broker(
+                connection_name=connection_name, max_consumers=max_consumers
+            )
+            cls.scheduler = BrokerWrapper(broker)
+        return cls.scheduler
 
 
 @cache
@@ -616,6 +630,3 @@ async def _create_async_connection(
             str(settings.rabbit_mq.url),
             **basic_params,
         )
-
-
-RabbitMQMessage = Annotated[RabbitMessage, Context()]
