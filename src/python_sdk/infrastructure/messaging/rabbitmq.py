@@ -8,7 +8,7 @@ from functools import cache
 from ssl import SSLContext
 from threading import Lock, Thread
 from time import sleep, time
-from typing import Any, AnyStr, Callable, Optional, Self, Union
+from typing import Annotated, Any, AnyStr, Callable, Optional, Self, Union
 
 from aio_pika import Message, connect_robust
 from aio_pika.abc import (
@@ -20,8 +20,9 @@ from aio_pika.abc import (
 from aio_pika.abc import (
     DeliveryMode as AioPikaDeliveryMode,
 )
+from faststream import Context
 from faststream.rabbit import RabbitBroker as RB  # noqa
-from faststream.rabbit.fastapi import RabbitRouter
+from faststream.rabbit.fastapi import RabbitMessage, RabbitRouter
 from faststream.security import BaseSecurity
 from pika import BasicProperties, BlockingConnection, ConnectionParameters, SSLOptions
 from pika.adapters.blocking_connection import BlockingChannel
@@ -298,7 +299,8 @@ class RabbitMQ(AbstractContextManager):
             while time() - start_time < timeout:
                 sleep(0.2)
             self.sync_channel.connection.add_callback_threadsafe(
-                lambda: self.sync_channel.stop_consuming(consumer_tag=consumer_tag)
+                lambda: self.sync_channel.stop_consuming(
+                    consumer_tag=consumer_tag)
             )
             t.join()
 
@@ -591,7 +593,8 @@ def _create_sync_connection(
         conn_params = ConnectionParameters(
             host=settings.rabbit_mq.dsn.host,
             port=settings.rabbit_mq.dsn.port,
-            ssl_options=SSLOptions(create_ssl_context(), settings.rabbit_mq.dsn.host),
+            ssl_options=SSLOptions(create_ssl_context(),
+                                   settings.rabbit_mq.dsn.host),
             credentials=ExternalCredentials(),
             **basic_params,
         )
@@ -630,3 +633,5 @@ async def _create_async_connection(
             str(settings.rabbit_mq.url),
             **basic_params,
         )
+
+RabbitMQMessage = Annotated[RabbitMessage, Context()]
