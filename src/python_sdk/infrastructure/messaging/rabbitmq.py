@@ -297,8 +297,7 @@ class RabbitMQ(AbstractContextManager):
             while time() - start_time < timeout:
                 sleep(0.2)
             self.sync_channel.connection.add_callback_threadsafe(
-                lambda: self.sync_channel.stop_consuming(
-                    consumer_tag=consumer_tag)
+                lambda: self.sync_channel.stop_consuming(consumer_tag=consumer_tag)
             )
             t.join()
 
@@ -535,6 +534,7 @@ class RabbitMQConnectionManager:
                         **base_args,
                     )
                 )
+
         return cls.broker
 
 
@@ -577,8 +577,7 @@ def _create_sync_connection(
         conn_params = ConnectionParameters(
             host=settings.rabbit_mq.dsn.host,
             port=settings.rabbit_mq.dsn.port,
-            ssl_options=SSLOptions(create_ssl_context(),
-                                   settings.rabbit_mq.dsn.host),
+            ssl_options=SSLOptions(create_ssl_context(), settings.rabbit_mq.dsn.host),
             credentials=ExternalCredentials(),
             **basic_params,
         )
