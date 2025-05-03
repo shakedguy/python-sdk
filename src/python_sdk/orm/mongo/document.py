@@ -94,19 +94,6 @@ class Document(MongoQueriesMixin, MongoCommandsMixin):
                         keys=index.pymongo_keys,
                         unique=index.unique,
                         background=index.background,
-                        partialFilterExpression={
-                            list(index.pymongo_keys.keys())[0]: {
-                                "$exists": True,
-                                "$ne": None,
-                            }
-                        },
-                    )
-                    if index.unique and len(index.pymongo_keys) == 1
-                    else coll.create_index(
-                        name=index.name,
-                        keys=index.pymongo_keys,
-                        unique=index.unique,
-                        background=index.background,
                     )
                     for index in indexes
                 ]
