@@ -46,8 +46,8 @@ LOGGING_CONFIG: Dict[str, Any] = {
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "level": "DEBUG",
-            "formatter": "colorized",
+            "level": "INFO",
+            "formatter": "detailed",
         },
     },
     "loggers": {
