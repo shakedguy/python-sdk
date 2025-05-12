@@ -1,14 +1,16 @@
 import logging.config
-from datetime import UTC, datetime
+from datetime import datetime
 from logging import INFO, LogRecord
 from typing import Any, Dict
+from pytz import timezone as tz
 
 import colorlog
 
 
 def format_time(record: LogRecord) -> str:
-    dt = datetime.fromtimestamp(record.created, tz=UTC)
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.fromtimestamp(record.created, tz=tz("Asia/Tel_Aviv")).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
 
 class ISO8601Formatter(logging.Formatter):
