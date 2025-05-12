@@ -8,9 +8,7 @@ import colorlog
 
 
 def format_time(record: LogRecord) -> str:
-    return datetime.fromtimestamp(record.created, tz=tz("Asia/Tel_Aviv")).strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
+    return datetime.fromtimestamp(record.created, tz=tz("Asia/Tel_Aviv")).isoformat()
 
 
 class ISO8601Formatter(logging.Formatter):
