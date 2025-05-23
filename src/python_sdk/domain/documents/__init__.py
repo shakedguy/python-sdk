@@ -1,21 +1,89 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Collection, Optional, Type, override
+from collections.abc import Collection
+from typing import Any, Mapping, Optional, Type, Union, cast, override
 
+from loguru import logger
 from pydantic import (
     AliasChoices,
     Field,
     PositiveInt,
 )
+from pymongo import ASCENDING, DESCENDING, GEO2D, GEOSPHERE, HASHED, TEXT
 
 from ... import errors
+from ...domain.base.base_model import BaseModel
+from ...domain.base.fields import DateTimeField, DocumentIDField
 from ...infrastructure.db import Mongo, MongoCollection
-from ...utils import DateTime, find_subclasses
-from ..models.fields import DateTimeField, DocumentIDField
-from .base_document import DocumentIndex, DocumentIndexType
-from .commands import MongoCommandsMixin
-from .queries import MongoQueriesMixin
+from ...orm.mongo.commands import MongoCommandsMixin
+from ...orm.mongo.queries import MongoQueriesMixin
+from ...utils import DateTime, Strings, enums, find_subclasses
+
+
+class DocumentIndexType(enums.StrEnum):
+    ASCENDING = "asc"
+    DESCENDING = "desc"
+    TEXT = "text"
+    HASHED = "hashed"
+    GEOSPHERE = "2dsphere"
+    GEO2D = "2d"
+
+    @property
+    def pymongo_value(self) -> Union[int, str]:
+        mapping = {
+            DocumentIndexType.ASCENDING: ASCENDING,
+            DocumentIndexType.DESCENDING: DESCENDING,
+            DocumentIndexType.TEXT: TEXT,
+            DocumentIndexType.HASHED: HASHED,
+            DocumentIndexType.GEOSPHERE: GEOSPHERE,
+            DocumentIndexType.GEO2D: GEO2D,
+        }
+        return mapping[self]
+
+
+class DocumentIndex(BaseModel):
+    name: str = Field(..., title="Name", description="The index name.")
+    unique: Optional[bool] = Field(
+        default=False, title="Unique", description="The index is unique."
+    )
+    background: Optional[bool] = Field(
+        default=False,
+        title="Background",
+        description="Index is created in the background.",
+    )
+    fields: dict[str, DocumentIndexType] = Field(
+        ..., title="Keys", description="The index keys."
+    )
+
+    @property
+    def pymongo_keys(self) -> Mapping[str, Any]:
+        return {k: v.pymongo_value for k, v in self.fields.items()}
+
+
+class BaseDocument(BaseModel):
+    class Meta:
+        collection_name: str = ""
+        indexes: Collection[DocumentIndex] = list()
+
+    @classmethod
+    def get_collection_name(cls) -> str:
+        return getattr(cls.Meta, "collection_name", None) or Strings.to_snake_case(
+            Strings.to_plural(cls.__name__)
+        )
+
+    @classmethod
+    def get_fields(cls) -> set[str]:
+        return set(sorted((cast(dict, cls.model_fields)).keys()))
+
+    def before_update(self) -> None: ...
+
+    def before_insert(self) -> None: ...
+
+    async def before_update_async(self) -> None: ...
+
+    async def before_insert_async(self) -> None: ...
+
 
 VERSION_INDEX = DocumentIndex(
     name="idx_id_and_version",
@@ -24,7 +92,7 @@ VERSION_INDEX = DocumentIndex(
 )
 
 
-class Document(MongoQueriesMixin, MongoCommandsMixin):
+class Document(BaseDocument, MongoQueriesMixin, MongoCommandsMixin):
     id: DocumentIDField = Field(
         default=None,
         title="Id",
@@ -82,6 +150,7 @@ class Document(MongoQueriesMixin, MongoCommandsMixin):
 
     @classmethod
     async def create_indexes_async(cls) -> None:
+        logger.debug("Creating indexes")
         indexes = cls.get_indexes()
         if not len(indexes or []):
             return
@@ -140,7 +209,7 @@ class DocumentVersionModel(Document):
 
     @classmethod
     def get_indexes(cls) -> Collection[DocumentIndex]:
-        return [VERSION_INDEX]
+        return list(super().get_indexes()) + [VERSION_INDEX]
 
 
 class DocumentTimeStampedModel(Document):

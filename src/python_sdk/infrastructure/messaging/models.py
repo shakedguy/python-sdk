@@ -4,7 +4,8 @@ from typing import Any, Generic, Optional, Self, TypeVar, Union
 
 from pydantic import Field, model_validator
 
-from ...orm import BaseModel, DateTimeField, UUIDField, base_validate_before
+from ...domain.base.base_model import BaseModel, base_validate_before
+from ...domain.base.fields import DateTimeField, UUIDField
 from ...utils import Crypto, DateTime
 
 

@@ -1,13 +1,13 @@
 from typing import Any, Generic, Literal, Optional, Self, TypeVar, Union
 
 from bson.objectid import ObjectId
+from pydantic import BaseModel
 
+from ...domain.base.fields import DocumentID
 from ...infrastructure.db import Postgres
 from ...utils import DateTime
-from ..models.fields import DocumentID
-from .base_entity import BaseEntity
 
-EntityType = TypeVar("EntityType", bound=BaseEntity)
+EntityType = TypeVar("EntityType", bound=BaseModel)
 
 
 class SQLCommandsMixin(Generic[EntityType]):  # noqa

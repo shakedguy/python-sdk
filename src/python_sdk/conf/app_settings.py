@@ -1,12 +1,13 @@
 import logging
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Optional, Union
 
 from pydantic import (
     AmqpDsn,
     BaseModel,
     BeforeValidator,
     Field,
+    KafkaDsn,
     MongoDsn,
     PostgresDsn,
     RedisDsn,
@@ -24,6 +25,8 @@ PathField = Annotated[Path, BeforeValidator(lambda x: Path(x))]
 BooleanField = Annotated[
     bool, BeforeValidator(lambda x: str(x) == "1" or str(x).lower() == "true")
 ]
+
+BrokerDsn = Union[AmqpDsn, RedisDsn, KafkaDsn]
 base_model_config = {
     "env_file": ".env",
     "env_file_encoding": "utf-8",
@@ -108,11 +111,11 @@ class PostgresSettings(BaseSettings):
         }
 
 
-class RabbitMQSettings(BaseSettings):
+class BrokerSettings(BaseSettings):
     model_config = SettingsConfigDict(
         **base_model_config,
-        env_prefix="rabbitmq_",
-        cli_prefix="rabbitmq_",
+        env_prefix="broker_",
+        cli_prefix="broker_",
     )
 
     url: str = Field(
@@ -120,7 +123,7 @@ class RabbitMQSettings(BaseSettings):
         description="RabbitMQ URL",
     )
 
-    virtual_host: str = Field(
+    virtual_host: Optional[str] = Field(
         default="/",
         title="Virtual Host",
         description="The RabbitMQ virtual host to use for the connection",
@@ -149,8 +152,14 @@ class RabbitMQSettings(BaseSettings):
     )
 
     @property
-    def dsn(self) -> AmqpDsn:
-        return AmqpDsn(self.url)
+    def dsn(self) -> BrokerDsn:
+        return (
+            AmqpDsn(self.url)
+            if "amqp" in self.url
+            else RedisDsn(self.url)
+            if "redis" in self.url
+            else KafkaDsn(self.url)
+        )
 
 
 class KubernetesSettings(BaseSettings):
@@ -193,7 +202,7 @@ class Settings(BaseSettings):
     def timezone(self) -> tz:
         return tz(self.timezone_name)
 
-    rabbit_mq: RabbitMQSettings = RabbitMQSettings()
+    broker: BrokerSettings = BrokerSettings()
     redis: RedisSettings = RedisSettings()
     mongo: MongoSettings = MongoSettings()
     postgres: PostgresSettings = PostgresSettings()

@@ -93,11 +93,13 @@ class BaseModel(PydanticBaseModel, mixins.DictMixin):
 
     @override
     def model_dump(self, **kwargs) -> dict[str, Any]:
-        return super().model_dump(serialize_as_any=True, **kwargs)
+        kwargs.setdefault("serialize_as_any", True)
+        return super().model_dump(**kwargs)
 
     @override
     def model_dump_json(self, **kwargs) -> str:
-        return super().model_dump_json(serialize_as_any=True, **kwargs)
+        # kwargs.setdefault("serialize_as_any", True)
+        return super().model_dump_json(**kwargs)
 
     @cached_property
     def flatten(self) -> dict[str, Any]:

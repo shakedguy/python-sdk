@@ -13,17 +13,16 @@ from typing import (
 )
 
 from psycopg.types.json import Jsonb
-from pydantic import create_model
+from pydantic import BaseModel, create_model
 from typing_extensions import Generic
 
 from ...conf import constants
+from ...domain.base.base_model import base_validate_before
 from ...infrastructure.db import Postgres
 from ...utils import Strings
 from ..base import FindAsyncResult, FindResult
-from ..models.base_model import base_validate_before
-from .base_entity import BaseEntity
 
-EntityType = TypeVar("EntityType", bound=BaseEntity)
+EntityType = TypeVar("EntityType", bound=BaseModel)
 
 
 class SQLQueriesMixin(Generic[EntityType]):

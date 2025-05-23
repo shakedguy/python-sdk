@@ -22,7 +22,7 @@ from ...utils import Crypto, DateTime
 T = TypeVar("T")
 
 SetField = Annotated[
-    set[T],
+    set[T],  # noqa
     BeforeValidator(lambda x: set(x) if x else set()),
     PlainSerializer(lambda x: list(x)),
 ]
@@ -38,9 +38,17 @@ JSONValue = Union[JSONPrimitive | JSONObject | JSONArray]
 JSONPayload = Union[JSONObject | JSONArray]
 
 
+def to_datetime(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    return DateTime.to_datetime(value)
+
+
 DateTimeField: Optional[datetime] = Annotated[
     Optional[datetime],
-    BeforeValidator(lambda x: DateTime.to_datetime(x) if x else None),
+    BeforeValidator(to_datetime),
 ]
 
 DateTimeISOStrField: str = Annotated[
@@ -73,7 +81,7 @@ FloatField: Optional[float] = Annotated[
 
 
 def _parse_json_field(value: Any) -> JsonValue:
-    if isinstance(value, str):
+    if isinstance(value, (str, bytes, bytearray, memoryview)):
         try:
             return from_json(value)
         except ValueError:

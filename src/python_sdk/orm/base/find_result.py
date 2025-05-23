@@ -6,7 +6,7 @@ from typing import (
     TypeVar,
 )
 
-from ..models.base_model import BaseModel
+from ...domain.base.base_model import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 

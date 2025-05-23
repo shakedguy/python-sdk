@@ -1,6 +1,7 @@
 from collections.abc import Collection
 from typing import (
     Any,
+    Generic,
     Iterable,
     Literal,
     Mapping,
@@ -14,23 +15,24 @@ from typing import (
 from bson.objectid import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 from py_cachify import lock
+from pydantic import BaseModel
 from pymongo import ReplaceOne, ReturnDocument, UpdateOne
 from pymongo.results import BulkWriteResult
 
+from ...domain.base.fields import DocumentID
 from ...errors import ConcurrencyError, NotExistsError
 from ...infrastructure.db import Mongo, MongoCollection
 from ...utils import DateTime, Strings
-from ..models.fields import DocumentID
-from .base_document import BaseDocument
+from ...utils.objects import model_dump
 
-DocumentType = TypeVar("DocumentType", bound=BaseDocument)
+DocumentType = TypeVar("DocumentType", bound=BaseModel)
 
 VersionCheckResult = Literal["valid", "not exist", "version mismatch"]
 
 ReplaceOneItem = tuple[Mapping[str, Any], Union[Mapping[str, Any], DocumentType]]
 
 
-class MongoCommandsMixin(BaseDocument):
+class MongoCommandsMixin(Generic[DocumentType]):
     @classmethod
     def get_collection_name(cls) -> str:
         return getattr(cls.Meta, "collection_name", None) or Strings.to_snake_case(  # noqa
@@ -38,19 +40,27 @@ class MongoCommandsMixin(BaseDocument):
         )
 
     @classmethod
+    def is_pydantic_model(cls) -> bool:
+        return issubclass(cls, BaseModel)
+
+    @classmethod
     def replace_one(
         cls, match: Mapping[str, Any], replacement: Mapping[str, Any]
     ) -> Optional[Self]:
         with MongoCollection(name=cls.get_collection_name()) as collection:
-            replaced = collection.find_one_and_replace(
+            replaced: Optional[dict[str, Any]] = collection.find_one_and_replace(
                 filter=match,
                 replacement=replacement,
                 upsert=True,
                 return_document=ReturnDocument.AFTER,
             )
-            replaced["id"] = str(replaced.get("id", None) or replaced.get("_id", None))
+            if not replaced:
+                return None
+            replaced.setdefault(
+                "id", str(replaced.get("_id", None) or replaced.get("id", None))
+            )
 
-            return cls.model_validate(replaced) if replaced else None
+            return cls.model_validate(replaced) if cls.is_pydantic_model() else replaced  # type: ignore
 
     @classmethod
     async def replace_one_async(
@@ -61,9 +71,7 @@ class MongoCommandsMixin(BaseDocument):
         async with MongoCollection(name=cls.get_collection_name()) as collection:
             replaced = await collection.find_one_and_replace(
                 filter=match,
-                replacement=replacement.model_dump()
-                if isinstance(replacement, BaseDocument)
-                else replacement,
+                replacement=model_dump(replacement),
                 upsert=True,
                 return_document=ReturnDocument.AFTER,
             )
@@ -349,9 +357,7 @@ class MongoCommandsMixin(BaseDocument):
         return [
             ReplaceOne(
                 filter=match,
-                replacement=replacement.model_dump()
-                if isinstance(replacement, BaseDocument)
-                else replacement,
+                replacement=model_dump(replacement),
                 upsert=True,
             )
             for match, replacement in requests

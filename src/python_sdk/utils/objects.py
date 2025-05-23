@@ -1,7 +1,18 @@
 import copy
 import inspect
 from abc import ABC
-from typing import Any, Callable, Collection, Type, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Collection,
+    Literal,
+    Mapping,
+    Optional,
+    Type,
+    TypeAlias,
+    TypeVar,
+    Union,
+)
 
 import pydash as _
 from pydantic import BaseModel
@@ -12,6 +23,48 @@ from .strings import Strings
 ValidIterables = Union[dict[str, Any], Collection[Any]]
 
 T = TypeVar("T")
+IncEx: TypeAlias = Union[
+    set[int],
+    set[str],
+    Mapping[int, Union["IncEx", bool]],
+    Mapping[str, Union["IncEx", bool]],
+]
+
+
+def model_dump(
+    model: Union[BaseModel, Mapping[str, Any]],
+    mode: Literal["json", "python"] = "python",
+    exclude: Optional[IncEx] = None,
+    include: Optional[IncEx] = None,
+    serialize_as_any: bool = True,
+) -> dict[str, Any]:
+    """
+    Dump a Pydantic model or dictionary to a dictionary.
+
+    Args:
+        model (BaseModel | dict[str, Any]): The Pydantic model or dictionary to dump.
+        mode (str): The mode of serialization. Defaults to "dict".
+        exclude (IncEx, optional): Fields to exclude from the serialization. Defaults to None.
+        include (IncEx, optional): Fields to include in the serialization. Defaults to None.
+        serialize_as_any (bool): Whether to serialize as any. Defaults to True.
+
+    Returns:
+        dict[str, Any]: The resulting dictionary.
+    """
+
+    if not isinstance(model, (BaseModel, dict)):
+        raise ValueError("Invalid data type, must be a dict or Pydantic model")
+
+    return (
+        model.model_dump(
+            mode=mode,
+            exclude=exclude,
+            include=include,
+            serialize_as_any=serialize_as_any,
+        )
+        if isinstance(model, BaseModel)
+        else dict(model)
+    )
 
 
 def dict_or_pydantic_model_to_dict(

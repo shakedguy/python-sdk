@@ -39,9 +39,13 @@ class Mongo(AbstractContextManager):
     __slots__ = ()
 
     def __enter__(self) -> Database:
+        if not MongoClients.sync_client:
+            MongoClients.init_clients()
         return MongoClients.sync_client.get_database(name=settings.mongo.db_name)
 
     async def __aenter__(self) -> AsyncIOMotorDatabase:
+        if not MongoClients.async_client:
+            MongoClients.init_clients()
         return MongoClients.async_client.get_database(name=settings.mongo.db_name)
 
     def __exit__(self, exc_type, exc_val, exc_tb):

@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator, Generator
 from typing import (
     Any,
-    Literal,
+    Generic,
     Mapping,
     Optional,
     Self,
@@ -11,20 +11,18 @@ from typing import (
 )
 
 from bson.objectid import ObjectId
+from pydantic import BaseModel
 
 from ...conf import constants
+from ...domain.base.fields import DocumentID
 from ...infrastructure.db import Mongo, MongoCollection
 from ...utils import Strings
 from ..base import FindAsyncResult, FindResult
-from ..models.fields import DocumentID
-from .base_document import BaseDocument
 
-DocumentType = TypeVar("DocumentType", bound=BaseDocument)
-
-VersionCheckResult = Literal["valid", "not exist", "version mismatch"]
+DocumentType = TypeVar("DocumentType", bound=BaseModel)
 
 
-class MongoQueriesMixin(BaseDocument):
+class MongoQueriesMixin(Generic[DocumentType]):
     @classmethod
     def get_collection_name(cls) -> str:
         return getattr(cls.Meta, "collection_name", None) or Strings.to_snake_case(  # noqa
