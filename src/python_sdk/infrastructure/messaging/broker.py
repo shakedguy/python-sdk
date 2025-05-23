@@ -38,6 +38,7 @@ class Broker(object):
         *,
         connection_name: Optional[str] = None,
         max_consumers: int = 5,
+        virtualhost: Optional[str] = None,
         tls: bool = False,
     ) -> None:
         url = url.lower() if isinstance(url, str) else url.unicode_string()
@@ -51,6 +52,7 @@ class Broker(object):
             if self.broker_type == "rabbitmq"
             else KafkaDsn(url=url)
         )
+        self._virtualhost: Optional[str] = virtualhost
         self.max_consumers: int = max_consumers
         connection_name = connection_name or "buzzerpy"
         self.connection_name: Optional[str] = (
@@ -81,6 +83,7 @@ class Broker(object):
             "max_consumers": self.max_consumers,
             "security": self._security,
             "logger": logger,
+            "virtualhost": self._virtualhost,
             "client_properties": {
                 "connection_name": self.connection_name,
             },
