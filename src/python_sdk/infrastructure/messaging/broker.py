@@ -140,6 +140,7 @@ class Broker(object):
         headers: dict[str, Any] | None = None,
         timeout: Optional[float] = 10.0,
         routing_key: Optional[str] = None,
+        expiration: Optional[float] = None,
     ) -> Optional[BrokerMessage]:
         if self.broker_type == "kafka":
             worker = KafkaRPCWorker(broker=self._broker)
@@ -174,6 +175,7 @@ class Broker(object):
             timeout=timeout,
             headers=headers,
             routing_key=routing_key,
+            expiration=expiration,
         )
         return (
             BrokerMessage(
