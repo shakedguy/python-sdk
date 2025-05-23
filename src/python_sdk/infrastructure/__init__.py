@@ -3,9 +3,7 @@ import logging
 import sys
 from typing import Any
 
-from ..conf.logger import get_logger
-
-logger = get_logger("PythoSDK.Infrastructure", level=logging.DEBUG)
+from loguru import logger
 
 
 def init(

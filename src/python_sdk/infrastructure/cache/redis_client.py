@@ -1,9 +1,9 @@
 import asyncio
-import logging
 from contextlib import AbstractContextManager
 from threading import Lock
 from typing import Any, Awaitable, Optional
 
+from loguru import logger
 from py_cachify import init_cachify
 from redis import Connection as SyncConnection
 from redis import ConnectionPool as SyncConnectionPool
@@ -19,10 +19,7 @@ from redis.asyncio import (
 )
 
 from ...conf import settings
-from ...conf.logger import get_logger
 from ...utils.decorators import singleton
-
-logger = get_logger("RedisClient", level=logging.DEBUG)
 
 params: dict[str, Any] = {
     "url": settings.redis.url,

@@ -1,4 +1,3 @@
-import logging
 from asyncio import Semaphore
 from contextlib import AbstractContextManager
 from datetime import datetime
@@ -8,6 +7,7 @@ from typing import Optional, Union
 from asyncpg import Pool as AsyncPool
 from asyncpg import Record, create_pool
 from asyncpg.connection import Connection
+from loguru import logger
 from psycopg import (
     Connection as SyncConnection,
 )
@@ -22,10 +22,7 @@ from psycopg_pool import ConnectionPool as SyncPool
 from pydantic_core import from_json, to_json
 
 from ...conf.app_settings import settings
-from ...conf.logger import get_logger
 from ...utils.decorators import singleton
-
-logger = get_logger(name="Postgres", level=logging.DEBUG)
 
 
 @singleton
@@ -139,8 +136,7 @@ class Postgres(AbstractContextManager):
         )
         await self.async_connection.set_type_codec(
             "timestamp",  # ✅ Correct type name
-            encoder=lambda x: x.replace(
-                tzinfo=None).isoformat() if x else None,
+            encoder=lambda x: x.replace(tzinfo=None).isoformat() if x else None,
             decoder=lambda x: datetime.fromisoformat(x) if x else None,
             format="text",
             schema="pg_catalog",

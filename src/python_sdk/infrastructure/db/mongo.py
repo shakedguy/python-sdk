@@ -1,8 +1,8 @@
-import logging
 from contextlib import AbstractContextManager
 from threading import Lock
 from typing import Optional
 
+from loguru import logger
 from motor.motor_asyncio import (
     AsyncIOMotorClient,
     AsyncIOMotorCollection,
@@ -13,10 +13,7 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 
 from ...conf.app_settings import settings
-from ...conf.logger import get_logger
 from ...utils.decorators import singleton
-
-logger = get_logger("Mongo", level=logging.DEBUG)
 
 
 @singleton

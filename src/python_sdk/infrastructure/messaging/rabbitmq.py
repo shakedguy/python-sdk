@@ -24,6 +24,7 @@ from faststream import Context
 from faststream.rabbit import RabbitBroker as RB  # noqa
 from faststream.rabbit.fastapi import RabbitMessage, RabbitRouter
 from faststream.security import BaseSecurity
+from loguru import logger
 from pika import BasicProperties, BlockingConnection, ConnectionParameters, SSLOptions
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.credentials import ExternalCredentials
@@ -32,13 +33,11 @@ from pika.exchange_type import ExchangeType
 from taskiq_faststream import BrokerWrapper
 
 from ...conf import settings
-from ...conf.logger import get_logger
 from ...utils.crypto import Crypto
 from ...utils.decorators import singleton
 
 logging.getLogger("pika").setLevel(logging.ERROR)
 logging.getLogger("aiormq.channel").setLevel(logging.FATAL)
-logger = get_logger(name="RabbitMQ", level=logging.DEBUG)
 
 
 class RabbitMQ(AbstractContextManager):
