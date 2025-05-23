@@ -83,7 +83,6 @@ class Broker(object):
             "logger": logger,
             "client_properties": {
                 "connection_name": self.connection_name,
-                "auth": "PLAIN",
             },
         }
         if self._security is None:
