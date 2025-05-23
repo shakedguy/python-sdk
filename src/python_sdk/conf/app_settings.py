@@ -10,6 +10,7 @@ from pydantic import (
     MongoDsn,
     PostgresDsn,
     RedisDsn,
+    field_validator,
     model_validator,
 )
 from pydantic_settings import (
@@ -152,6 +153,26 @@ class RabbitMQSettings(BaseSettings):
         return AmqpDsn(self.url)
 
 
+class KubernetesSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        **base_model_config,
+        env_prefix="kube_",
+        cli_prefix="kube_",
+    )
+
+    pod_name: Optional[str] = Field(default=None, title="Pod name")
+
+    @field_validator("pod_name", mode="before")
+    @classmethod
+    def validate_pod_name(cls, value: Optional[str]) -> str:
+        if not value:
+            from ..utils import Crypto
+
+            value = f"pod-{Crypto.uuid7()}"
+
+        return value
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(**base_model_config)
     env: str = Field(
@@ -176,6 +197,7 @@ class Settings(BaseSettings):
     redis: RedisSettings = RedisSettings()
     mongo: MongoSettings = MongoSettings()
     postgres: PostgresSettings = PostgresSettings()
+    kube: KubernetesSettings = KubernetesSettings()
 
     @property
     def is_dev(self) -> bool:
