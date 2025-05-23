@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
@@ -195,6 +196,10 @@ class Settings(BaseSettings):
     @property
     def static_dir(self) -> Path:
         return self.base_dir / "static"
+
+    @property
+    def log_level(self) -> int:
+        return logging.DEBUG if self.is_dev or self.debug else logging.INFO
 
 
 settings: Settings = Settings()  # noqa
