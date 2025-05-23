@@ -35,11 +35,9 @@ def init(
 def cleanup(*args: Any) -> int:  # noqa:
     from .cache import RedisClient
     from .db import Mongo, Postgres
-    from .messaging import RabbitMQ
 
     logger.debug("Cleaning up resources")
     Mongo.close()
-    RabbitMQ.close()
     Postgres.close()
     RedisClient.close()
 
@@ -50,13 +48,10 @@ def cleanup(*args: Any) -> int:  # noqa:
 async def cleanup_async(*args: Any) -> int:  # noqa:
     from .cache import RedisClient
     from .db import Mongo, Postgres
-    from .messaging import RabbitMQ
 
     logger.debug("Cleaning up resources")
     Mongo.close()
-    await asyncio.gather(
-        RabbitMQ.close_async(), Postgres.close_async(), RedisClient.close_async()
-    )
+    await asyncio.gather(Postgres.close_async(), RedisClient.close_async())
 
     logger.debug("Cleanup completed successfully")
     return 0
@@ -94,7 +89,7 @@ async def init_async(
 
 
 def init_mongo_clients() -> None:
-    from ..orm import Document, View
+    from ..domain import Document, View
     from .db import Mongo
 
     Mongo.init_clients()
@@ -106,7 +101,7 @@ def init_mongo_clients() -> None:
 
 
 async def init_mongo_clients_async():
-    from ..orm import Document, View
+    from ..domain import Document, View
     from .db import Mongo
 
     Mongo.init_clients()
