@@ -1,66 +1,39 @@
-import logging.config
+import sys
 from datetime import datetime
-from logging import INFO, LogRecord
-from typing import Any, Dict
-from pytz import timezone as tz
+from typing import Any
 
-import colorlog
+from loguru import logger
 
+from .app_settings import settings
 
-def format_time(record: LogRecord) -> str:
-    return datetime.fromtimestamp(record.created, tz=tz("Asia/Tel_Aviv")).isoformat()
+LOG_FORMAT = "<green>[{local_time}]</green> | <level>{level.name}</level> | <cyan>{pod_name}:{name}</cyan> | <blue>{module}.{function}</blue>:<yellow>{line}</yellow> | <level>{message}</level>\n"
 
 
-class ISO8601Formatter(logging.Formatter):
-    def formatTime(self, record: LogRecord, datefmt: str | None = None) -> str:
-        return format_time(record=record)
+def format_log(record: Any) -> str:
+    return LOG_FORMAT.format(
+        **dict(record),
+        local_time=datetime.now(settings.timezone).strftime(
+            "%Y-%m-%d %H:%M:%S (UTC%z)"
+        ),
+        pod_name=settings.kube.pod_name,
+    )
 
 
-class ColoredISO8601Formatter(colorlog.ColoredFormatter):
-    def formatTime(self, record: LogRecord, datefmt: str | None = None) -> str:
-        return format_time(record=record)
+logger.remove()
+logger.add(
+    sys.stderr, level=settings.log_level, colorize=True, enqueue=True, format=format_log
+)
 
 
-LOGGING_CONFIG: Dict[str, Any] = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "colorized": {
-            "()": ColoredISO8601Formatter,
-            "format": "%(log_color)s[%(asctime)s] - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-            "log_colors": {
-                "DEBUG": "cyan",
-                "INFO": "green",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "bold_red",
-            },
-        },
-        "detailed": {
-            "()": ISO8601Formatter,
-            "format": "[%(asctime)s] - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "level": "INFO",
-            "formatter": "detailed",
-        },
-    },
-    "loggers": {
-        "": {
-            "level": "INFO",
-            "handlers": ["console"],
-        },
-    },
-}
-
-
-logging.config.dictConfig(LOGGING_CONFIG)
-
-
-def get_logger(name: str, level: int | str = INFO) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(level.upper() if isinstance(level, str) else level)
-    return logger
+def configure_logger() -> None:
+    """
+    Configure the logger settings.
+    """
+    logger.remove()
+    logger.add(
+        sys.stderr,
+        level=settings.log_level,
+        colorize=True,
+        enqueue=True,
+        format=format_log,
+    )

@@ -13,7 +13,7 @@ tasks:
     cmds:
       - uv run tmp.py
 
-  push:
+  publish:
     cmds:
       - task: lint
       - git add .
