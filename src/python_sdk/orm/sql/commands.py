@@ -3,9 +3,9 @@ from typing import Any, Generic, Literal, Optional, Self, TypeVar, Union
 from bson.objectid import ObjectId
 from pydantic import BaseModel
 
-from ...domain.base.fields import DocumentID
 from ...infrastructure.db import Postgres
 from ...utils import DateTime
+from ..mongo.commands import DocumentID
 
 EntityType = TypeVar("EntityType", bound=BaseModel)
 
