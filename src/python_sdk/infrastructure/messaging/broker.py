@@ -467,6 +467,19 @@ class KafkaRPCWorker:
 
 
 class BrokerMessage(BaseModel):
+    """
+    Represents a message in the broker system.
+    This class is used to define the structure of messages sent to and from the broker.
+
+    Attributes:
+        message_id (str): Unique identifier for the message.
+        body (bytes): The body of the message.
+        content_type (Optional[str]): Content type of the message.
+        headers (Optional[dict[str, str]]): Headers of the message.
+        correlation_id (Optional[str]): Correlation ID for the message.
+        timestamp (Optional[Union[int, datetime, float, timedelta]]): Timestamp of the message.
+    """
+
     message_id: str = Field(
         default_factory=Crypto.uuid7,
         title="Message ID",
