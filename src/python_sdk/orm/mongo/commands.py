@@ -113,7 +113,7 @@ class MongoCommandsMixin(Generic[DocumentType]):
     def save(self) -> None:
         _id = getattr(self, "id", None)
         created = (  # noqa
-            self.update(_id, self) if _id is not None else self.create(self)
+            self.update_one(_id, self) if _id is not None else self.create(self)
         )
 
         if created is not None:
@@ -125,7 +125,7 @@ class MongoCommandsMixin(Generic[DocumentType]):
     async def save_async(self) -> None:
         _id = getattr(self, "id", None)
         created = (  # noqa
-            await self.update_async(_id, self)
+            await self.update_one_async(_id, self)
             if _id is not None
             else await self.create_async(self)
         )
@@ -183,7 +183,7 @@ class MongoCommandsMixin(Generic[DocumentType]):
             return cls.model_validate(created) if created else None
 
     @classmethod
-    def update(
+    def update_one(
         cls, pk: Union[str, DocumentID, ObjectId], entity: DocumentType
     ) -> Optional[Self]:
         entity = cls.model_validate(entity)  # noqa
@@ -279,7 +279,7 @@ class MongoCommandsMixin(Generic[DocumentType]):
         return await _check_version(collection)
 
     @classmethod
-    async def update_async(
+    async def update_one_async(
         cls, pk: Union[str, DocumentID, ObjectId], entity: DocumentType
     ) -> Optional[Self]:
         if not entity:
