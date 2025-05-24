@@ -6,7 +6,7 @@ from typing import (
     TypeVar,
 )
 
-from ...domain.base.base_model import BaseModel
+from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 
