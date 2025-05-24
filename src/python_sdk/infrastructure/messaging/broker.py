@@ -218,7 +218,7 @@ class Broker(object):
             return BrokerMessage(body=response)
         if self.broker_type == "redis":
             response: RedisMessage = await cast(RedisBroker, self._broker).request(
-                message=message,
+                message=_prepare_message(message),
                 channel=to if pub_type == "pubsub" or pub_type is None else None,
                 list=to if pub_type == "list" else None,
                 stream=to if pub_type == "stream" else None,
