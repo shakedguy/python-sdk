@@ -1,6 +1,6 @@
 import json
 from collections import UserDict
-from collections.abc import ItemsView, KeysView, Mapping, ValuesView
+from collections.abc import ItemsView, KeysView, ValuesView
 from inspect import ismethod
 from typing import Any, Iterator, Self
 
@@ -156,12 +156,12 @@ class DictMixin(UserDict):
         res.pop("data", None)
         return res.items()
 
-    def update(self, **kwargs: Mapping[str, Any]) -> None:  # type: ignore
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+    # def update(self, **kwargs: Mapping[str, Any]) -> None:  # type: ignore
+    #     for key, value in kwargs.items():
+    #         setattr(self, key, value)
+    #
+    #     for key, value in kwargs.items():
+    #         setattr(self, key, value)
 
     def clear(self) -> None:
         """Clear dict."""
