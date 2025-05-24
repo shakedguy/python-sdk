@@ -14,10 +14,10 @@ from bson.objectid import ObjectId
 from pydantic import BaseModel
 
 from ...conf import constants
-from ...domain.base.fields import DocumentID
 from ...infrastructure.db import Mongo, MongoCollection
 from ...utils import Strings
 from ..base import FindAsyncResult, FindResult
+from .commands import DocumentID
 
 DocumentType = TypeVar("DocumentType", bound=BaseModel)
 

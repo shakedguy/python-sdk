@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Collection
 from typing import (
     Any,
@@ -11,18 +13,28 @@ from typing import (
     TypeVar,
     Union,
 )
+from uuid import UUID
 
+from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 from py_cachify import lock
-from pydantic import BaseModel
+from pydantic import (
+    BaseModel,
+    GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
+)
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema, core_schema
+from pydantic_core.core_schema import (
+    ValidationInfo,
+)
 from pymongo import ReplaceOne, ReturnDocument, UpdateOne
 from pymongo.results import BulkWriteResult
 
-from ...domain.base.fields import DocumentID
 from ...errors import ConcurrencyError, NotExistsError
 from ...infrastructure.db import Mongo, MongoCollection
-from ...utils import DateTime, Strings
+from ...utils import Crypto, DateTime, Strings
 from ...utils.objects import model_dump
 
 DocumentType = TypeVar("DocumentType", bound=BaseModel)
@@ -362,3 +374,81 @@ class MongoCommandsMixin(Generic[DocumentType]):
             )
             for match, replacement in requests
         ]
+
+
+plain_validator = (
+    core_schema.with_info_plain_validator_function
+    if hasattr(core_schema, "with_info_plain_validator_function")
+    else core_schema.with_info_plain_validator_function
+)
+
+
+class DocumentID(ObjectId):
+    """
+    ObjectId field. Compatible with Pydantic.
+    """
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v, _: ValidationInfo):
+        if isinstance(v, bytes):
+            v = v.decode("utf-8")
+        try:
+            return cls(v)
+        except (InvalidId, TypeError) as e:
+            raise ValueError("Id must be of type PydanticObjectId") from e
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,  # noqa
+        handler: GetCoreSchemaHandler,  # noqa
+    ) -> CoreSchema:  # type: ignore
+        return core_schema.json_or_python_schema(
+            python_schema=plain_validator(cls.validate),
+            json_schema=plain_validator(
+                cls.validate,
+                metadata={
+                    "pydantic_js_input_core_schema": core_schema.str_schema(
+                        pattern="^[0-9a-f]{24}$",
+                        min_length=24,
+                        max_length=24,
+                    )
+                },
+            ),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda instance: str(instance), when_used="json"
+            ),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls,
+        schema: core_schema.CoreSchema,
+        handler: GetJsonSchemaHandler,  # type: ignore
+    ) -> JsonSchemaValue:
+        json_schema = handler(schema)
+        json_schema.update(
+            type="string",
+            example="5eb7cf5a86d9755df3a6c593",
+        )
+        return json_schema
+
+    @staticmethod
+    def from_uuid(id_: Union[UUID, str]) -> "DocumentID":
+        return DocumentID(Crypto.to_object_id_str(id_))
+
+
+def _create_document_id(value: Any) -> Optional[DocumentID]:
+    if not value:
+        return None
+    if isinstance(value, DocumentID):
+        return value
+    if isinstance(value, ObjectId):
+        return DocumentID(str(value))
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        value = value.decode("utf-8")
+    return DocumentID(str(value))
