@@ -249,15 +249,15 @@ class DocumentTimeStampedVersionedModel(DocumentVersionModel, DocumentTimeStampe
     pass
 
 
-class View(MongoQueriesMixin):
+class MongoView(MongoQueriesMixin):
     class Meta:
         collection_name: str = ""
         source: str = ""
         pipeline: Collection[dict[str, str]] = list()
 
     @staticmethod
-    def get_all_views() -> Collection[Type[View]]:
-        return find_subclasses(View)
+    def get_all_views() -> Collection[Type[MongoView]]:
+        return find_subclasses(MongoView)
 
     @classmethod
     def get_pipeline(cls) -> Collection[dict[str, str]]:

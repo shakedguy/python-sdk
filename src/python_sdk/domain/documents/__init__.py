@@ -6,4 +6,5 @@ from ._documents import (
     DocumentTimeStampedModel,
     DocumentTimeStampedVersionedModel,
     DocumentVersionModel,
+    MongoView,
 )

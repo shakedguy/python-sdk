@@ -89,19 +89,19 @@ async def init_async(
 
 
 def init_mongo_clients() -> None:
-    from ..domain import Document, View
+    from ..domain import Document, MongoView
     from .db import Mongo
 
     Mongo.init_clients()
     for d in Document.get_all_documents():
         d.create_indexes()
 
-    for v in View.get_all_views():
+    for v in MongoView.get_all_views():
         v.create()
 
 
 async def init_mongo_clients_async():
-    from ..domain import Document, View
+    from ..domain import Document, MongoView
     from .db import Mongo
 
     Mongo.init_clients()
@@ -109,6 +109,6 @@ async def init_mongo_clients_async():
     await asyncio.gather(
         *(
             [d.create_indexes_async() for d in Document.get_all_documents()]
-            + [v.create_async() for v in View.get_all_views()]
+            + [v.create_async() for v in MongoView.get_all_views()]
         )
     )
