@@ -171,6 +171,8 @@ class KubernetesSettings(BaseSettings):
 
     pod_name: Optional[str] = Field(default=None, title="Pod name")
 
+    public_ip: Optional[str] = Field(default=None, title="Public IP")
+
     @field_validator("pod_name", mode="before")
     @classmethod
     def validate_pod_name(cls, value: Optional[str]) -> str:
