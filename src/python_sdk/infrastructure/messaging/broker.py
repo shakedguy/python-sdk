@@ -96,7 +96,6 @@ class Broker(object):
             "reconnect_interval": 5.0,
             "publisher_confirms": False,
             "max_consumers": self.max_consumers,
-            "logger": logger,
             "client_properties": {
                 "connection_name": self.connection_name,
             },
@@ -125,7 +124,6 @@ class Broker(object):
             self.url.unicode_string(),
             security=self._security,
             log_level=settings.log_level,
-            logger=logger,
         )
 
     def _create_redis_broker(self) -> RedisBroker:
@@ -133,7 +131,6 @@ class Broker(object):
             self.url.unicode_string(),
             security=self._security,
             log_level=settings.log_level,
-            logger=logger,
         )
 
     async def start(self) -> None:
