@@ -1,9 +1,10 @@
 import base64
+import html
 import re
 import unicodedata
 from abc import ABC
 from os import PathLike
-from typing import Any, Iterable, Optional, TypeVar, Union
+from typing import Any, Iterable, Optional, TypeVar, Union, cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import inflect
@@ -20,16 +21,30 @@ from .regex import (
     JS_RE_LATIN1,
     JS_RE_UNICODE_WORDS,
     RE_APOS,
+    RE_CODE_BLOCK,
     RE_CRON,
     RE_DIGITS,
     RE_FALSELY,
     RE_HAS_UNICODE_WORD,
+    RE_HASHTAG,
     RE_HEBREW,
+    RE_HEX,
+    RE_HTML,
+    RE_INLINE_CODE,
+    RE_MARKDOWN_FMT,
+    RE_MD_LINK,
+    RE_MENTION,
+    RE_METADATA,
+    RE_PHONE,
+    RE_PUNCT,
+    RE_SPACE,
+    RE_SYMBOLS,
     RE_TRUTHY,
+    TRANSLATE_TABLE,
     JSRegExp,
 )
 
-AnyStr = TypeVar("AnyStr", bytes, str, bytearray, memoryview)
+AnyStr = Union[bytes, str, bytearray, memoryview]
 T = TypeVar("T")
 T2 = TypeVar("T2")
 
@@ -278,6 +293,34 @@ class Strings(ABC):  # noqa
             return False
 
     @classmethod
+    def is_ascii(cls, text: AnyStr) -> bool:
+        """
+        Checks if the given string is ASCII.
+
+        Args:
+            text (AnyStr): The string to check.
+
+        Returns:
+            bool: True if the string is ASCII, False otherwise.
+        """
+        text = cls.to_str(text)
+        return all(ord(char) < 128 for char in text)
+
+    @classmethod
+    def is_hex(cls, text: AnyStr) -> bool:
+        """
+        Checks if the given string is a valid hexadecimal string.
+
+        Args:
+            text (AnyStr): The string to check.
+
+        Returns:
+            bool: True if the string is a valid hexadecimal string, False otherwise.
+        """
+        text = cls.to_str(text)
+        return bool(RE_HEX.fullmatch(text))
+
+    @classmethod
     def format_phone_number(
         cls, text: AnyStr, region: Optional[str] = None
     ) -> Optional[str]:
@@ -291,19 +334,17 @@ class Strings(ABC):  # noqa
         Returns:
             str: The formatted phone number.
         """
+
         if not isinstance(text, str) or not text.strip():
             return None
         text = cls.to_str(text)
 
         try:
             parsed_number = phonenumbers.parse(number=text, region=region)
-            if phonenumbers.is_valid_number(parsed_number):
-                return phonenumbers.format_number(
-                    parsed_number, phonenumbers.PhoneNumberFormat.E164
-                )
-            else:
-                return None
-        except phonenumbers.NumberParseException:
+            return phonenumbers.format_number(
+                parsed_number, phonenumbers.PhoneNumberFormat.E164
+            )
+        except Exception:  # noqa
             if not len(region or ""):
                 return cls.format_phone_number(text, region="IL")
             return None
@@ -647,3 +688,178 @@ class Strings(ABC):  # noqa
             step = digit * ((i % 2) + 1)
             total += step - 9 if step > 9 else step
         return total % 10 == 0
+
+    @classmethod
+    def to_base64(cls, text: AnyStr) -> str:
+        """
+        Converts a string to its Base64 representation.
+
+        Args:
+            text (AnyStr): The input text to convert.
+
+        Returns:
+            str: The Base64 encoded string.
+        """
+        return (
+            cls.to_str(text)
+            if cls.is_base64(text)
+            else base64.b64encode(cls.to_str(text).encode()).decode()
+        )
+
+    @classmethod
+    def from_base64(cls, text: AnyStr) -> str:
+        """
+        Converts a Base64 encoded string back to its original representation.
+
+        Args:
+            text (AnyStr): The Base64 encoded text to convert.
+
+        Returns:
+            str: The decoded string.
+        """
+        return (
+            base64.b64decode(cls.to_str(text)).decode()
+            if cls.is_base64(text)
+            else cls.to_str(text)
+        )
+
+    @classmethod
+    def to_hex(cls, text: AnyStr) -> str:
+        """
+        Converts a string to its hexadecimal representation.
+
+        Args:
+            text (AnyStr): The input text to convert.
+
+        Returns:
+            str: The hexadecimal encoded string.
+        """
+        res = cls.to_str(text)
+        return res if cls.is_hex(res) else res.encode().hex()
+
+    @classmethod
+    def from_hex(cls, text: AnyStr) -> str:
+        """
+        Converts a hexadecimal encoded string back to its original representation.
+
+        Args:
+            text (AnyStr): The hexadecimal encoded text to convert.
+
+        Returns:
+            str: The decoded string.
+        """
+        return bytes.fromhex(cls.to_str(text)).decode()
+
+    @classmethod
+    def to_ascii(cls, text: AnyStr) -> str:
+        """
+        Converts a string to its ASCII representation.
+
+        Args:
+            text (AnyStr): The input text to convert.
+
+        Returns:
+            str: The ASCII encoded string.
+        """
+        return cls.to_str(text).encode("ascii", "ignore").decode()
+
+    @classmethod
+    def normalize(
+        cls,
+        text: AnyStr,
+        html_tags: bool = True,
+        code_blocks: bool = True,
+        whatsapp_markdowns: bool = True,
+        link_markdowns: bool = True,
+        mentions: bool = True,
+        bracketed_metadata: bool = True,
+        phone_numbers: bool = True,
+        smart_quotes: bool = True,
+        emojis: bool = True,
+        accented_characters: bool = True,
+        repeated_punctuation: bool = True,
+    ) -> str:
+        """
+        Normalize a string by cleaning and standardizing its content.
+
+        This method applies a series of normalization steps to the input text, such as:
+        - Removing or unescaping HTML tags and entities.
+        - Removing code blocks and inline code.
+        - Removing WhatsApp Markdown formatting.
+        - Converting Markdown links to plain URLs.
+        - Removing mentions and hashtags.
+        - Removing bracketed metadata (e.g., [image], [media omitted]).
+        - Normalizing phone numbers to international format.
+        - Replacing smart quotes and dashes with ASCII equivalents.
+        - Removing emojis and non-text symbols.
+        - Normalizing accented characters to ASCII.
+        - Replacing repeated punctuation with a single period.
+        - Collapsing multiple spaces into one and stripping whitespace.
+
+        Each normalization step can be enabled or disabled via keyword arguments.
+
+        Args:
+            text (AnyStr): The input text to normalize.
+            html_tags (bool): Whether to unescape and remove HTML tags. Defaults to True.
+            code_blocks (bool): Whether to remove code blocks and inline code. Defaults to True.
+            whatsapp_markdowns (bool): Whether to remove WhatsApp Markdown formatting. Defaults to True.
+            link_markdowns (bool): Whether to convert Markdown links to URLs. Defaults to True.
+            mentions (bool): Whether to remove @mentions and hashtags. Defaults to True.
+            bracketed_metadata (bool): Whether to remove bracketed metadata. Defaults to True.
+            phone_numbers (bool): Whether to normalize phone numbers. Defaults to True.
+            smart_quotes (bool): Whether to replace smart quotes and dashes. Defaults to True.
+            emojis (bool): Whether to remove emojis and non-text symbols. Defaults to True.
+            accented_characters (bool): Whether to normalize accented characters. Defaults to True.
+            repeated_punctuation (bool): Whether to replace repeated punctuation. Defaults to True.
+
+        Returns:
+            str: The normalized string.
+
+        Example:
+            >>> some_text = "<p>Hello *world*! Call +1 (555) 123-4567 or visit [site](https://example.com). Mention @user, emoji 😊, `code`, hashtag #topic, and -- dashes – “quotes”. </p>"
+            >>> normalized_text = Strings.normalize(some_text)
+            >>> print(normalized_text)
+            "Hello world! Call +15551234567 or visit https://example.com. Mention emoji code hashtag and -- dashes - "quotes"."
+        """
+        if not text:
+            return text
+        text = cls.to_str(text)
+
+        if not text:
+            return text
+        text = cls.to_str(text)
+
+        steps = [
+            (html_tags, lambda t: RE_HTML.sub("", html.unescape(t))),
+            (code_blocks, lambda t: RE_INLINE_CODE.sub("", RE_CODE_BLOCK.sub("", t))),
+            (whatsapp_markdowns, lambda t: RE_MARKDOWN_FMT.sub(r"\2", t)),
+            (link_markdowns, lambda t: RE_MD_LINK.sub(r"\2", t)),
+            (mentions, lambda t: RE_HASHTAG.sub("", RE_MENTION.sub("", t))),
+            (bracketed_metadata, lambda t: RE_METADATA.sub("", t)),
+            (
+                phone_numbers,
+                lambda t: RE_PHONE.sub(
+                    lambda f: f" {cls.format_phone_number(f.group().strip())} "
+                    if f
+                    else "",
+                    t,
+                ),
+            ),
+            (smart_quotes, lambda t: t.translate(TRANSLATE_TABLE)),
+            (emojis, lambda t: RE_SYMBOLS.sub("", t)),
+            (
+                accented_characters,
+                lambda t: cls.deburr(unicodedata.normalize("NFKD", t)),
+            ),
+            (repeated_punctuation, lambda t: RE_PUNCT.sub(".", t)),
+        ]
+
+        for enabled, func in steps:
+            if enabled:
+                text = func(text)
+
+        # Collapse multiple spaces into one
+        text = RE_SPACE.sub(" ", text)
+
+        # Final strip of leading/trailing whitespace
+        return text.strip()

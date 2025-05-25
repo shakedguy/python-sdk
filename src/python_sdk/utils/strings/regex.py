@@ -235,3 +235,38 @@ RE_FALSELY = re.compile(
 )
 RE_DIGITS = re.compile(r"\d+")
 RE_HEBREW = re.compile(r"[\u0590-\u05FF]")
+RE_HEX = re.compile(r"^[0-9a-fA-F]+$")
+RE_HTML = re.compile(r"<[^>]+>")  # Matches HTML tags
+RE_CODE_BLOCK = re.compile(r"```.*?```", re.DOTALL)  # Matches multiline code blocks
+RE_INLINE_CODE = re.compile(r"`[^`]+`")  # Matches inline code
+RE_MARKDOWN_FMT = re.compile(
+    r"(\*{1,2}|_{1,2}|~{1,2})(.*?)\1"
+)  # Matches markdown/WhatsApp formatting
+RE_MD_LINK = re.compile(
+    r"$begin:math:display$([^$end:math:display$]+)]$begin:math:text$(https?://[^$end:math:text$]+)\)"
+)  # Extracts raw URL from markdown link
+RE_MENTION = re.compile(r"(?<!\w)@\w+\b")  # Matches @mentions, excluding emails
+RE_HASHTAG = re.compile(r"#\w+")  # Matches hashtags
+RE_METADATA = re.compile(
+    r"$begin:math:display$[^$end:math:display$]*]"
+)  # Matches bracketed metadata like [image]
+RE_PHONE = re.compile(
+    r"(\+?\d[\d\s\-().]{7,})"
+)  # Matches international and local phone numbers
+RE_SYMBOLS = re.compile(
+    r"[^\w\s.,;:!?\-+\'/]", re.UNICODE
+)  # Matches unwanted symbols and emojis
+RE_PUNCT = re.compile(r"[.!?]{2,}")  # Matches repeated end-of-sentence punctuation
+RE_SPACE = re.compile(r"\s+")  # Matches excess whitespace
+
+# Translation map for smart quotes and dashes to ASCII equivalents
+TRANSLATE_TABLE = str.maketrans(
+    {
+        "’": "'",
+        "‘": "'",
+        "“": '"',
+        "”": '"',
+        "–": "-",
+        "—": "-",
+    }
+)
