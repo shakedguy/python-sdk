@@ -24,7 +24,7 @@ class HttpClient(AsyncClient):
         self,
         *,
         base_url: Optional[URL | str] = "",
-        api_access_token: Optional[str] = None,
+        headers: Optional[Mapping[str, str]] = None,
         timeout: float
         | None
         | tuple[float | None, float | None, float | None, float | None]
@@ -36,7 +36,7 @@ class HttpClient(AsyncClient):
         time_period: float = 1.0,
     ):
         super().__init__(
-            headers={"api_access_token": api_access_token},
+            headers=headers,
             proxy=proxy,
             timeout=timeout,
             limits=limits,
