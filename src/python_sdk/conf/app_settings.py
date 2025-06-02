@@ -118,12 +118,13 @@ class BrokerSettings(BaseSettings):
         cli_prefix="broker_",
     )
 
-    url: str = Field(
-        default="amqp://guest:guest@localhost:5672/",
-        description="RabbitMQ URL",
+    url: Optional[str] = Field(
+        default=None,
+        title="Broker URL",
+        description="RabbitMQ Or Kafka Or Redis URL",
     )
 
-    virtual_host: Optional[str] = Field(
+    vhost: str = Field(
         default="/",
         title="Virtual Host",
         description="The RabbitMQ virtual host to use for the connection",
@@ -154,12 +155,24 @@ class BrokerSettings(BaseSettings):
     @property
     def dsn(self) -> BrokerDsn:
         return (
-            AmqpDsn(self.url)
-            if "amqp" in self.url
-            else RedisDsn(self.url)
-            if "redis" in self.url
+            RedisDsn(self.url)
+            if self.is_redis
+            else AmqpDsn(self.url)
+            if self.is_rabbitmq
             else KafkaDsn(self.url)
         )
+
+    @property
+    def is_rabbitmq(self) -> bool:
+        return self.url and "amqp" in self.url
+
+    @property
+    def is_redis(self) -> bool:
+        return self.url and "redis" in self.url
+
+    @property
+    def is_kafka(self) -> bool:
+        return self.url and not (self.is_rabbitmq or self.is_redis)
 
 
 class KubernetesSettings(BaseSettings):

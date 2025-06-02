@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import ssl
 from asyncio import Future, wait_for
 from datetime import datetime, timedelta
@@ -7,7 +8,7 @@ from functools import cache
 from ssl import SSLContext
 from typing import Any, AnyStr, Literal, Optional, Sequence, Union, cast, overload
 
-import orjson
+from faststream.broker.fastapi import StreamRouter
 from faststream.confluent import KafkaBroker, KafkaMessage, TopicPartition
 from faststream.confluent.subscriber.asyncapi import (
     AsyncAPISubscriber as KafkaSubscriber,
@@ -22,9 +23,13 @@ from loguru import logger
 from pydantic import AmqpDsn, Field, KafkaDsn, RedisDsn
 from pydantic import BaseModel as PydanticBaseModel
 
-from ...conf import settings
-from ...domain import BaseModel
-from ...utils import Crypto, DateTime, Strings
+from ....conf.app_settings import settings
+from ....domain.base.base_model import BaseModel
+from ....utils import Crypto, DateTime, Strings
+from ..queues import create_rabbit_queue
+from .kafka import KafkaBrokerFactory
+from .rabbitmq import RabbitMQBrokerFactory
+from .redis import RedisBrokerFactory
 
 Subscriber = Union[RedisSubscriber, RabbitSubscriber, KafkaSubscriber]
 BrokerType = Union[RabbitBroker, RedisBroker, KafkaBroker]
@@ -34,11 +39,9 @@ BrokerUrl = Union[str, RedisDsn, AmqpDsn, KafkaDsn]
 class Broker(object):
     __slots__ = (
         "_broker",
-        "_virtualhost",
         "_security",
         "broker_type",
         "url",
-        "max_consumers",
         "connection_name",
         "responses",
         "_kafka_worker",
@@ -46,11 +49,10 @@ class Broker(object):
 
     def __init__(
         self,
-        url: BrokerUrl,
+        url: BrokerUrl = settings.broker.url,
         *,
         connection_name: Optional[str] = None,
         max_consumers: int = 5,
-        virtualhost: Optional[str] = None,
         tls: bool = False,
     ) -> None:
         url = url.lower() if isinstance(url, str) else url.unicode_string()
@@ -64,8 +66,7 @@ class Broker(object):
             if self.broker_type == "rabbitmq"
             else KafkaDsn(url=url)
         )
-        self._virtualhost: Optional[str] = virtualhost
-        self.max_consumers: int = max_consumers
+
         connection_name = connection_name or "buzzerpy"
         self.connection_name: Optional[str] = (
             f"{Strings.slugify(connection_name)}:{Crypto.uuid7()[:12]}"
@@ -79,76 +80,50 @@ class Broker(object):
         )
         self.responses: dict[str, Future[bytes]] = {}
         if self.broker_type == "rabbitmq":
-            self._broker = self._create_rabbit_broker()
+            self._broker = RabbitMQBrokerFactory.create_broker(
+                connection_name=self.connection_name,
+                max_consumers=max_consumers,
+                use_ssl=tls,
+            )
         elif self.broker_type == "redis":
-            self._broker = self._create_redis_broker()
+            self._broker = RedisBrokerFactory.create_broker(
+                connection_name=self.connection_name,
+                use_ssl=tls,
+            )
         elif self.broker_type == "kafka":
-            self._broker = self._create_kafka_broker()
+            self._broker = KafkaBrokerFactory.create_broker(
+                connection_name=self.connection_name,
+                use_ssl=tls,
+            )
+            self._kafka_worker = KafkaRPCWorker(self._broker)
         else:
             raise ValueError(f"Unsupported broker type: {self.broker_type}")
-        self._kafka_worker: Optional[KafkaRPCWorker] = (
-            KafkaRPCWorker(broker=self._broker) if self.broker_type == "kafka" else None
-        )
-
-    def _create_rabbit_broker(self) -> RabbitBroker:
-        args: dict[str, Any] = {
-            "log_level": settings.log_level,
-            "reconnect_interval": 5.0,
-            "publisher_confirms": False,
-            "max_consumers": self.max_consumers,
-            "client_properties": {
-                "connection_name": self.connection_name,
-            },
-        }
-
-        if self._security is None:
-            print(self.url.unicode_string(), self._virtualhost)
-            return RabbitBroker(
-                "amqp://appoint:8175f0bb084d58ed@194.32.77.169:5672/esbot",
-                virtualhost="esbot",
-                # **args,
-            )
-
-        else:
-            args["client_properties"]["auth"] = "EXTERNAL"
-            args["security"] = self._security
-            return RabbitBroker(
-                host=self.url.host,
-                port=self.url.port,
-                virtualhost=self._virtualhost,
-                **args,
-            )
-
-    def _create_kafka_broker(self) -> KafkaBroker:
-        return KafkaBroker(
-            self.url.unicode_string(),
-            security=self._security,
-            log_level=settings.log_level,
-        )
 
     def _create_redis_broker(self) -> RedisBroker:
         return RedisBroker(
             self.url.unicode_string(),
             security=self._security,
             log_level=settings.log_level,
+            logger=logger,
         )
 
     async def start(self) -> None:
         try:
-            await self._broker.start()
+            if not self._broker.running:
+                await self._broker.start()
         except Exception as e:
-            logger.error(f"Error starting broker: {repr(e)}")
+            logger.error("Error starting broker: {error}", error=e)
 
     async def close(self) -> None:
         try:
             await self._broker.close()
         except Exception as e:
-            logger.error(f"Error closing broker: {repr(e)}")
+            logger.error("Error closing broker: {error}", error=e)
 
     async def publish(
         self,
         message: SendableMessage,
-        to: str,
+        to: Union[str, RabbitQueue, PubSub, ListSub, StreamSub],
         *,
         exchange: Union[str, RabbitExchange, None] = None,
         pub_type: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
@@ -156,6 +131,7 @@ class Broker(object):
         maxlen: Optional[int] = None,
         expiration: Optional[int | datetime | float | timedelta] = None,
         routing_key: Optional[str] = "",
+        auto_delete: bool = False,
         **kwargs,
     ) -> None:
         match self.broker_type:
@@ -176,13 +152,15 @@ class Broker(object):
                     **kwargs,
                 )
             case "rabbitmq":
+                queue = (
+                    create_rabbit_queue(to, auto_delete=auto_delete)
+                    if isinstance(to, str)
+                    else to
+                )
+                await self.declare_rabbit_queue(queue)
                 await cast(RabbitBroker, self._broker).publish(
                     _prepare_message(message),
-                    queue=to
-                    if isinstance(to, RabbitQueue)
-                    else RabbitQueue(
-                        name=to, durable=True, exclusive=False, auto_delete=False
-                    ),
+                    queue=queue,
                     exchange=exchange,
                     expiration=expiration,
                     routing_key=routing_key or "",
@@ -193,7 +171,7 @@ class Broker(object):
     async def request(
         self,
         message: SendableMessage,
-        to: str,
+        to: Union[str, RabbitQueue, PubSub, ListSub, StreamSub],
         *,
         exchange: Union[str, RabbitExchange, None] = None,
         pub_type: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
@@ -202,6 +180,7 @@ class Broker(object):
         timeout: Optional[float] = 30.0,
         expiration: Optional[int | datetime | float | timedelta] = None,
         routing_key: Optional[str] = "",
+        auto_delete: bool = False,
         **kwargs,
     ) -> Optional[BrokerMessage]:
         if self.broker_type == "kafka":
@@ -234,10 +213,15 @@ class Broker(object):
                 if response
                 else None
             )
-
+        queue = (
+            create_rabbit_queue(to, auto_delete=auto_delete)
+            if isinstance(to, str)
+            else to
+        )
+        await self.declare_rabbit_queue(queue)
         response: RabbitMessage = await cast(RabbitBroker, self._broker).request(
             _prepare_message(message),
-            queue=to,
+            queue=queue,
             exchange=exchange,
             timeout=timeout,
             headers=headers,
@@ -380,11 +364,9 @@ class Broker(object):
         auto_delete: bool = False,
     ) -> RabbitSubscriber:
         queue = (
-            RabbitQueue(
-                name=to,
-                durable=True,
-                exclusive=False,
-                auto_delete=auto_delete or False,
+            create_rabbit_queue(
+                to,
+                auto_delete=auto_delete,
             )
             if isinstance(to, str)
             else to
@@ -418,6 +400,42 @@ class Broker(object):
             no_ack=no_ack,
             no_reply=no_reply,
         )
+
+    @classmethod
+    def create_router(
+        cls,
+        url: BrokerUrl,
+        *,
+        connection_name: Optional[str] = None,
+        max_consumers: int = 5,
+        tls: bool = False,
+    ) -> StreamRouter:
+        url_str = url if isinstance(url, str) else url.unicode_string()
+        if "redis" in url_str:
+            return RedisBrokerFactory.create_router(
+                connection_name=connection_name, use_ssl=tls
+            )
+        elif "amqp" in url_str:
+            return RabbitMQBrokerFactory.create_router(
+                connection_name=connection_name,
+                use_ssl=tls,
+                max_consumers=max_consumers,
+            )
+        else:
+            return KafkaBrokerFactory.create_router(
+                connection_name=connection_name, use_ssl=tls
+            )
+
+    async def declare_rabbit_queue(self, queue: Union[str, RabbitQueue]) -> RabbitQueue:
+        """
+        Declare a RabbitMQ queue if it does not exist.
+        """
+        if self.broker_type != "rabbitmq":
+            raise ValueError("This method is only applicable for RabbitMQ brokers.")
+        if isinstance(queue, str):
+            queue = create_rabbit_queue(queue)
+        await cast(RabbitBroker, self._broker).declare_queue(queue)
+        return queue
 
 
 class KafkaRPCWorker:
@@ -464,19 +482,6 @@ class KafkaRPCWorker:
 
 
 class BrokerMessage(BaseModel):
-    """
-    Represents a message in the broker system.
-    This class is used to define the structure of messages sent to and from the broker.
-
-    Attributes:
-        message_id (str): Unique identifier for the message.
-        body (bytes): The body of the message.
-        content_type (Optional[str]): Content type of the message.
-        headers (Optional[dict[str, str]]): Headers of the message.
-        correlation_id (Optional[str]): Correlation ID for the message.
-        timestamp (Optional[Union[int, datetime, float, timedelta]]): Timestamp of the message.
-    """
-
     message_id: str = Field(
         default_factory=Crypto.uuid7,
         title="Message ID",
@@ -511,9 +516,7 @@ def _prepare_message(
     content_type = (
         "application/json" if isinstance(message, (dict, list)) else "text/plain"
     )
-    body: AnyStr = (
-        orjson.dumps(message) if isinstance(message, (dict, list)) else message
-    )
+    body: AnyStr = json.dumps(message) if isinstance(message, (dict, list)) else message
     body = body.encode("utf-8") if isinstance(body, str) else body
     return BrokerMessage(body=body, content_type=content_type)
 

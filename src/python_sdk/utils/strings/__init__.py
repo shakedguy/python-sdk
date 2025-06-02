@@ -4,15 +4,15 @@ import re
 import unicodedata
 from abc import ABC
 from os import PathLike
-from typing import Any, Iterable, Optional, TypeVar, Union, cast
+from typing import Any, Iterable, Optional, TypeVar, Union
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import inflect
 import phonenumbers
 from email_validator import EmailNotValidError, validate_email
 from phonenumbers import NumberParseException
+from pydash.chaining import chain
 
-from ..chain import Chain
 from ..collections import flatten_deep
 from ..decorators import memoize
 from .regex import (
@@ -539,7 +539,7 @@ class Strings(ABC):  # noqa
             >>> assert set(params.split("&")) == {"q=X", "y=Z"}
         """
         # allow reassignment different type
-        paths = Chain(args).flatten_deep().map(cls.to_str).value()  # type: ignore
+        paths = chain(args).flatten_deep().map(cls.to_str).value()  # type: ignore
         paths_list = []
         params_list = cls.flatten_url_params(kwargs)
 
@@ -552,8 +552,7 @@ class Strings(ABC):  # noqa
         path = cls.delimited_path_join("/", *paths_list)
         scheme, netloc, path, query, fragment = urlsplit(path)
         query = urlencode(params_list)
-
-        return urlunsplit((scheme, netloc, path, query, fragment))  # noqa
+        return cls.to_str(urlunsplit((scheme, netloc, path, query, fragment)))
 
     @classmethod
     def flatten_url_params(

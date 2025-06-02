@@ -10,6 +10,8 @@ from uuid import UUID
 
 from bson.objectid import ObjectId
 
+from .strings import Strings
+
 
 class Crypto(ABC):  # noqa
     """
@@ -85,18 +87,40 @@ class Crypto(ABC):  # noqa
         return original_pass_hash == current_pass_hash
 
     @classmethod
-    def generate_random_id(cls, length: int) -> str:
+    def generate_random_id(
+        cls,
+        length: int,
+        *,
+        simbols: bool = False,
+        encoding: Literal["ascii", "hex", "base64"] = "ascii",
+        case: Optional[Literal["upper", "lower"]] = None,
+    ) -> str:
         """
         Generates a random ID of the specified length.
 
         Args:
             length (int): The length of the random ID.
+            simbols (bool): Whether to include symbols in the ID, default is False.
+            encoding (Literal): The encoding of the ID, one of "ascii", "hex", "base64", default is "ascii".
+            case (Optional[Literal]): The case of the ID, one of "upper", "lower", default is None.
 
         Returns:
             str: The generated random ID.
         """
-        characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-        return "".join(random.choices(characters, k=length))
+        characters = string.ascii_uppercase + string.ascii_lowercase + string.digits
+        if simbols:
+            characters += string.punctuation
+
+        res = "".join(random.choices(characters, k=length))
+        if encoding == "hex":
+            res = Strings.to_hex(res)
+        elif encoding == "base64":
+            res = Strings.to_base64(res)
+
+        if not case:
+            return res
+
+        return res.upper() if "up" in case.lower() else res.lower()
 
     @classmethod
     def generate_random_token(

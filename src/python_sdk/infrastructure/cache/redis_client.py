@@ -5,12 +5,8 @@ from typing import Any, Awaitable, Optional
 
 from loguru import logger
 from py_cachify import init_cachify
-from redis import Connection as SyncConnection
 from redis import ConnectionPool as SyncConnectionPool
 from redis import Redis
-from redis.asyncio import (
-    Connection as AsyncConnection,
-)
 from redis.asyncio import (
     ConnectionPool as AsyncConnectionPool,
 )
@@ -38,7 +34,7 @@ class RedisPools:
     sync_pool: Optional[SyncConnectionPool] = None
     async_pool: Optional[AsyncConnectionPool] = None
     mutex: Lock = Lock()
-    sem:asyncio.Semaphore = asyncio.Semaphore(1)
+    sem: asyncio.Semaphore = asyncio.Semaphore(1)
 
     @classmethod
     def init_pools(cls) -> None:
@@ -70,10 +66,10 @@ class RedisClient(AbstractContextManager):
     __slots__ = ("sync_client", "async_client")
 
     def __init__(self):
-        self.sync_client: Optional[SyncConnection] = None
-        self.async_client: Optional[AsyncConnection] = None
+        self.sync_client: Optional[Redis] = None
+        self.async_client: Optional[AsyncRedis] = None
 
-    def __enter__(self):
+    def __enter__(self) -> Redis:
         self.sync_client = Redis.from_pool(connection_pool=RedisPools.sync_pool)
         if not self.sync_client.ping():
             raise Exception("Cannot connect to Redis")
@@ -82,9 +78,9 @@ class RedisClient(AbstractContextManager):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.sync_client:
-            self.pools.sync_pool.release(self.sync_client)  # type: ignore # noqa
+            self.sync_client.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> AsyncRedis:
         self.async_client = AsyncRedis.from_pool(connection_pool=RedisPools.async_pool)
         if not await self.async_client.ping():
             raise Exception("Cannot connect to Redis")
@@ -92,7 +88,7 @@ class RedisClient(AbstractContextManager):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.async_client:
-            await self.pools.async_pool.release(self.async_client)  # type: ignore # noqa
+            await self.async_client.aclose()
 
     @classmethod
     async def close_async(cls) -> None:
@@ -103,8 +99,6 @@ class RedisClient(AbstractContextManager):
         RedisPools.close()
 
 
-
-
 def init_cache() -> None:
     logger.debug("Initializing Redis cache")
     RedisPools.init_pools()
@@ -112,6 +106,7 @@ def init_cache() -> None:
         sync_client=Redis.from_pool(connection_pool=RedisPools.sync_pool),
         async_client=AsyncRedis.from_pool(connection_pool=RedisPools.async_pool),
     )
+
 
 def init_cache_async() -> Awaitable[None]:
     return asyncio.to_thread(init_cache)

@@ -161,29 +161,43 @@ class DateTime(datetime):
 
         return f"{hours:02}:{minutes:02}:{seconds:02}"
 
+    def to_str(self, _format: Optional[str] = None) -> str:
+        """
+        Converts the datetime object to a string.
+
+        Args:
+            _format (str, optional): The format string. Defaults to None.
+
+        Returns:
+            str: The datetime string.
+        """
+        return self.strftime(_format) if _format else self.isoformat()
+
     @classmethod
-    def to_str(cls, dt: Union[datetime, str, int | float]) -> str:
+    def to_format_str(
+        cls, dt: Union[datetime, AnyStr, int | float], _format: Optional[str] = None
+    ) -> str:
         """
         Converts a datetime object to a string.
 
         Args:
             dt (Union[datetime, str, int | float]): The datetime object to convert.
+            _format (str, optional): The format string. Defaults to None.
 
         Returns:
             str: The datetime string.
         """
-        if isinstance(dt, datetime):
-            return dt.isoformat()
-        if isinstance(dt, str):
-            dt = cls.from_str(dt)
-            if dt:
-                return dt.isoformat()
-        if isinstance(dt, (int, float)):
-            return datetime.fromtimestamp(dt).isoformat()
+        res = dt
+        if isinstance(res, (str, bytes, bytearray, memoryview)):
+            res = cls.from_str(res)
+        if isinstance(res, (int, float)):
+            res = datetime.fromtimestamp(res)
 
-        raise ValueError(
-            "Invalid input, must be a datetime object, string, or timestamp"
-        )
+        if not res:
+            raise ValueError(
+                "Invalid input, must be a datetime object, string, or timestamp"
+            )
+        return res.strftime(_format) if _format else res.isoformat()
 
     @classmethod
     def from_str(cls, datetime_str: str) -> Optional["DateTime"]:
@@ -302,7 +316,7 @@ class DateTime(datetime):
         )
 
     @classmethod
-    def to_app_timezone(cls, dt: Union[datetime, str, int | float]) -> Self:
+    def to_app_timezone(cls, dt: Union[datetime, AnyStr, int | float]) -> Self:
         """
         Converts a datetime object to the configured app timezone.
 
@@ -319,7 +333,7 @@ class DateTime(datetime):
                 dt = dt.replace(tzinfo=ZoneInfo(settings.timezone_name))
                 return cls.from_datetime(dt)
             return DateTime.from_datetime(dt)
-        if isinstance(dt, str):
+        if isinstance(dt, (str, bytes, bytearray, memoryview)):
             return cls.from_str(dt)
 
         if isinstance(dt, (int, float)):
@@ -346,9 +360,12 @@ class DateTime(datetime):
         Returns:
             datetime: The datetime object in UTC.
         """
-        dt = Strings.to_str(dt) if isinstance(dt, (str, bytes)) else dt
+
         if isinstance(dt, datetime):
-            return DateTime.from_datetime(dt.astimezone(UTC))
+            if not time.tzinfo or time.tzinfo != ZoneInfo("UTC"):
+                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+            return DateTime.from_datetime(dt)
+        dt = Strings.to_str(dt) if isinstance(dt, (str, bytes)) else dt
         if isinstance(dt, str):
             dt = cls.from_str(dt)
             if dt:
@@ -362,13 +379,13 @@ class DateTime(datetime):
 
     @staticmethod
     def is_valid_datetime(dt_str: AnyStr) -> bool:
-        dt_str = Strings.to_str(dt_str)
+        res = Strings.to_str(dt_str)
         try:
-            parser.parse(dt_str)
+            parser.parse(res)
             return True
         except Exception:  # noqa
             return any(
-                re.match(pattern, dt_str)
+                re.match(pattern, res)
                 for pattern in constants.DATETIME_REGEX_PATTERNS.keys()
             )
 
@@ -383,13 +400,13 @@ class DateTime(datetime):
         Returns:
             bool: True if the date string is valid, False otherwise.
         """
-        date_str = DateTime.to_str(date_str)
+        res = DateTime.to_format_str(date_str)
         try:
-            parser.parse(date_str)
+            parser.parse(res)
             return True
         except Exception:  # noqa
             return any(
-                re.match(pattern, date_str)
+                re.match(pattern, res)
                 for pattern in constants.DATE_ONLY_REGEX_PATTERNS.keys()
             )
 
@@ -404,13 +421,13 @@ class DateTime(datetime):
         Returns:
             bool: True if the time string is valid, False otherwise.
         """
-        time_str = DateTime.to_str(time_str)
+        res = DateTime.to_format_str(time_str)
         try:
-            parser.parse(time_str)
+            parser.parse(res)
             return True
         except Exception:  # noqa
             return any(
-                re.match(pattern, time_str)
+                re.match(pattern, res)
                 for pattern in constants.TIME_ONLY_REGEX_PATTERNS.keys()
             )
 

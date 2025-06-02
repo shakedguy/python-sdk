@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import sys
 from typing import Any
 
@@ -16,9 +15,7 @@ def init(
     logger.debug("Initializing resources")
 
     if init_postgres:
-        from .db import PostgresConnectionPool
-
-        PostgresConnectionPool.init_pools()
+        init_postgres_client()
 
     if init_cache:
         from .cache import init_cache
@@ -88,20 +85,39 @@ async def init_async(
     return 0
 
 
+def init_postgres_client() -> None:
+    from ..orm import SQLModel
+    from .db import PostgresConnectionPool
+
+    PostgresConnectionPool.init_pools()
+
+    for m in SQLModel.get_all_models():
+        m.create_table()
+
+
+async def init_postgres_client_async() -> None:
+    from ..orm import SQLModel
+    from .db import PostgresConnectionPool
+
+    await PostgresConnectionPool.init_pools_async()
+
+    await asyncio.gather(*[m.create_table_async() for m in SQLModel.get_all_models()])
+
+
 def init_mongo_clients() -> None:
-    from ..domain import Document, MongoView
+    from ..orm import Document, View
     from .db import Mongo
 
     Mongo.init_clients()
     for d in Document.get_all_documents():
         d.create_indexes()
 
-    for v in MongoView.get_all_views():
+    for v in View.get_all_views():
         v.create()
 
 
 async def init_mongo_clients_async():
-    from ..domain import Document, MongoView
+    from ..orm import Document, View
     from .db import Mongo
 
     Mongo.init_clients()
@@ -109,6 +125,6 @@ async def init_mongo_clients_async():
     await asyncio.gather(
         *(
             [d.create_indexes_async() for d in Document.get_all_documents()]
-            + [v.create_async() for v in MongoView.get_all_views()]
+            + [v.create_async() for v in View.get_all_views()]
         )
     )
