@@ -41,7 +41,7 @@ class HttpClient(AsyncClient):
             timeout=timeout,
             limits=limits,
             event_hooks=event_hooks,
-            base_url=URL(base_url) if base_url else None,
+            base_url=URL(base_url) if base_url is not None else None,
         )
         self.rate_limiter = AsyncLimiter(max_rate=max_rate, time_period=time_period)
 
