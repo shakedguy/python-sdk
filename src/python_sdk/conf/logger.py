@@ -17,6 +17,10 @@ def remove_unwanted_tags(text: str) -> str:
     )
 
 
+def escape_color_tags(value: str) -> str:
+    return re.sub(r"<([^<>]+)>", r"\\<\1\\>", value)
+
+
 def format_log(record: Any) -> str:
     from ..utils.strings import Strings
 
@@ -28,9 +32,10 @@ def format_log(record: Any) -> str:
         "pod_name": settings.kube.pod_name,
         "message": remove_unwanted_tags(Strings.normalize(record.pop("message", ""))),
     }
-    data.setdefault("module", "")
-    data.setdefault("function", "")
-    data.setdefault("name", "")
+    for key in ("module", "function", "name"):
+        val = data.get(key, "")
+        data[key] = escape_color_tags(str(val))
+
     return LOG_FORMAT.format(**data)
 
 
