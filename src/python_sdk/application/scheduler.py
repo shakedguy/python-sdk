@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Awaitable, Callable, Optional, Union
 
 from faststream import FastStream
@@ -46,13 +46,21 @@ class Scheduler(object):
         *,
         cron: Optional[str] = None,
         time: Optional[datetime] = None,
+        cron_offset: Union[str, timedelta, None] = None,
         **kwargs: Any,
     ) -> AsyncTaskiqDecoratedTask[[], None]:
-        if not any([cron, time]):
-            raise ValueError("Either cron or time must be provided.")
+        schedule: list[ScheduledTask] = []
+        if cron:
+            schedule.append(ScheduledTask(cron=cron, cron_offset=cron_offset))
+
+        if time:
+            schedule.append(ScheduledTask(time=time))
+
+        if not len(schedule):
+            raise ValueError("At least one schedule must be provided (cron or time).")
 
         return self.wrapper.task(
             message=message,
-            schedule=[ScheduledTask(cron=cron, time=time)],
+            schedule=schedule,
             **kwargs,
         )
