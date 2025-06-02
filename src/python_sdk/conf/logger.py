@@ -12,16 +12,18 @@ LOG_FORMAT = "<green>[{local_time}]</green> | <level>{level.name}</level> | <cya
 def format_log(record: Any) -> str:
     from ..utils.strings import Strings
 
-    message = Strings.normalize(record.pop("message", ""))
-    print(message, record)
-    return LOG_FORMAT.format(
+    data = {
         **dict(record),
-        local_time=datetime.now(settings.timezone).strftime(
+        "local_time": datetime.now(settings.timezone).strftime(
             "%Y-%m-%d %H:%M:%S (UTC%z)"
         ),
-        pod_name=settings.kube.pod_name,
-        message=message,
-    )
+        "pod_name": settings.kube.pod_name,
+        "message": Strings.normalize(record.pop("message", "")),
+    }
+    data.setdefault("module", "")
+    data.setdefault("function", "")
+    data.setdefault("name", "")
+    return LOG_FORMAT.format(**data)
 
 
 logger.remove()
