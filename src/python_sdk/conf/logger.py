@@ -1,3 +1,4 @@
+import re
 import sys
 from datetime import datetime
 from typing import Any
@@ -9,6 +10,13 @@ from .app_settings import settings
 LOG_FORMAT = "<green>[{local_time}]</green> | <level>{level.name}</level> | <cyan>{pod_name}:{name}</cyan> | <blue>{module}.{function}</blue>:<yellow>{line}</yellow> | <level>{message}</level>\n"
 
 
+def remove_unwanted_tags(text: str) -> str:
+    allowed = {"<green>", "<level>", "<cyan>", "<blue>", "<yellow>"}
+    return re.sub(
+        r"<[^<>]+>", lambda m: m.group(0) if m.group(0) in allowed else "", text
+    )
+
+
 def format_log(record: Any) -> str:
     from ..utils.strings import Strings
 
@@ -18,7 +26,7 @@ def format_log(record: Any) -> str:
             "%Y-%m-%d %H:%M:%S (UTC%z)"
         ),
         "pod_name": settings.kube.pod_name,
-        "message": Strings.normalize(record.pop("message", "")),
+        "message": remove_unwanted_tags(Strings.normalize(record.pop("message", ""))),
     }
     data.setdefault("module", "")
     data.setdefault("function", "")
