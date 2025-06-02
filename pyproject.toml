@@ -30,6 +30,7 @@ dependencies = [
     "pydash>=8.0.5",
     "pymongo>=4.11.3",
     "python-dateutil>=2.9.0.post0",
+    "python-socketio>=5.13.0",
     "pytz>=2025.2",
     "redis>=5.2.1",
     "taskiq-aio-pika>=0.4.2",
