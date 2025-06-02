@@ -13,6 +13,7 @@ def format_log(record: Any) -> str:
     from ..utils.strings import Strings
 
     message = Strings.normalize(record.pop("message", ""))
+    print(message, record)
     return LOG_FORMAT.format(
         **dict(record),
         local_time=datetime.now(settings.timezone).strftime(
