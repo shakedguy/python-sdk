@@ -25,11 +25,7 @@ def format_log(record: Any) -> str:
 
 logger.remove()
 logger.add(
-    sys.stderr,
-    level=settings.log_level,
-    colorize=False,
-    enqueue=True,
-    format=format_log,
+    sys.stderr, level=settings.log_level, colorize=True, enqueue=True, format=format_log
 )
 
 
@@ -41,7 +37,7 @@ def configure_logger() -> None:
     logger.add(
         sys.stderr,
         level=settings.log_level,
-        colorize=False,
+        colorize=True,
         enqueue=True,
         format=format_log,
     )
