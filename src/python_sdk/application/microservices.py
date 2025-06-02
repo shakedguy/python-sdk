@@ -82,9 +82,8 @@ class Microservice(object):
                 logger.info("microservice shutdown")
 
         @self.broker.subscribe(
-            to=f"{HEALTH_CHECK_QUEUE_NAME}:{self.name}",
+            to=HEALTH_CHECK_QUEUE_NAME,
             exchange=health_check_exchange,
-            auto_delete=True,
         )
         def _on_health_check(*args, **kwargs) -> APIHealthResponse:
             logger.debug("Received health check message")
