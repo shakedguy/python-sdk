@@ -37,10 +37,10 @@ class RabbitMQBrokerFactory:
         with cls.mutex:
             if cls.broker is None:
                 configs = RabbitMQConfigs(
+                    max_consumers=max_consumers,
                     use_ssl=use_ssl,
                     client_properties={
                         "connection_name": connection_name,
-                        "max_consumers": max_consumers,
                         "heartbeat": heartbeat,
                         "connection_timeout": connection_timeout,
                     },
@@ -70,9 +70,9 @@ class RabbitMQBrokerFactory:
             if cls.router is None:
                 configs = RabbitMQConfigs(
                     use_ssl=use_ssl,
+                    max_consumers=max_consumers,
                     client_properties={
                         "connection_name": connection_name,
-                        "max_consumers": max_consumers,
                         "heartbeat": heartbeat,
                         "connection_timeout": connection_timeout,
                     },
