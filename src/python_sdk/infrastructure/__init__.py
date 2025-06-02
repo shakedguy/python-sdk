@@ -86,7 +86,7 @@ async def init_async(
 
 
 def init_postgres_client() -> None:
-    from ..orm import SQLModel
+    from ..domain.entities import SQLModel
     from .db import PostgresConnectionPool
 
     PostgresConnectionPool.init_pools()
@@ -96,7 +96,7 @@ def init_postgres_client() -> None:
 
 
 async def init_postgres_client_async() -> None:
-    from ..orm import SQLModel
+    from ..domain.entities import SQLModel
     from .db import PostgresConnectionPool
 
     await PostgresConnectionPool.init_pools_async()
@@ -105,19 +105,19 @@ async def init_postgres_client_async() -> None:
 
 
 def init_mongo_clients() -> None:
-    from ..orm import Document, View
+    from ..domain.documents import Document, MongoView
     from .db import Mongo
 
     Mongo.init_clients()
     for d in Document.get_all_documents():
         d.create_indexes()
 
-    for v in View.get_all_views():
+    for v in MongoView.get_all_views():
         v.create()
 
 
 async def init_mongo_clients_async():
-    from ..orm import Document, View
+    from ..domain.documents import Document, MongoView
     from .db import Mongo
 
     Mongo.init_clients()
@@ -125,6 +125,6 @@ async def init_mongo_clients_async():
     await asyncio.gather(
         *(
             [d.create_indexes_async() for d in Document.get_all_documents()]
-            + [v.create_async() for v in View.get_all_views()]
+            + [v.create_async() for v in MongoView.get_all_views()]
         )
     )
