@@ -23,7 +23,7 @@ class HttpClient(AsyncClient):
     def __init__(
         self,
         *,
-        base_url: Optional[URL | str] = None,
+        base_url: Optional[URL | str] = "",
         api_access_token: Optional[str] = None,
         timeout: float
         | None
@@ -41,7 +41,7 @@ class HttpClient(AsyncClient):
             timeout=timeout,
             limits=limits,
             event_hooks=event_hooks,
-            base_url=URL(base_url) if base_url is not None else None,
+            base_url=URL(base_url) if base_url else "",
         )
         self.rate_limiter = AsyncLimiter(max_rate=max_rate, time_period=time_period)
 
