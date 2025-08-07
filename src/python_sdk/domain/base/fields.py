@@ -75,6 +75,22 @@ TimeOnlyStrField: Optional[str] = Annotated[
 EntityIDField: Optional[int] = Annotated[
     Optional[int], BeforeValidator(lambda x: int(x) if x else None)
 ]
+
+
+def to_default_entity_id(value: Any) -> Union[str, int]:
+    if value is None or isinstance(value, (UUID, str)):
+        return value or Crypto.uuid7()
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return value.decode("utf-8")
+    return str(value)
+
+
+DefaultEntityIDField: Union[str, int] = Annotated[
+    Union[str, int], BeforeValidator(to_default_entity_id)
+]
+
 FloatField: Optional[float] = Annotated[
     Optional[float], BeforeValidator(lambda x: float(x) if x else None)
 ]
@@ -107,11 +123,9 @@ JsonArrayField: Optional[list[dict[str, Any]]] = Annotated[
 
 JsonField: JsonValue = Annotated[JsonValue, BeforeValidator(_parse_json_field)]
 
-
 UUIDField: Optional[str] = Annotated[
     Optional[str], BeforeValidator(lambda x: str(x or Crypto.uuid7()))
 ]
-
 
 plain_validator = (
     core_schema.with_info_plain_validator_function
@@ -140,9 +154,9 @@ class DocumentID(ObjectId):
 
     @classmethod
     def __get_pydantic_core_schema__(
-        cls,
-        source_type: Any,  # noqa
-        handler: GetCoreSchemaHandler,  # noqa
+            cls,
+            source_type: Any,  # noqa
+            handler: GetCoreSchemaHandler,  # noqa
     ) -> CoreSchema:  # type: ignore
         return core_schema.json_or_python_schema(
             python_schema=plain_validator(cls.validate),
@@ -163,9 +177,9 @@ class DocumentID(ObjectId):
 
     @classmethod
     def __get_pydantic_json_schema__(
-        cls,
-        schema: core_schema.CoreSchema,
-        handler: GetJsonSchemaHandler,  # type: ignore
+            cls,
+            schema: core_schema.CoreSchema,
+            handler: GetJsonSchemaHandler,  # type: ignore
     ) -> JsonSchemaValue:
         json_schema = handler(schema)
         json_schema.update(
