@@ -1,10 +1,13 @@
 from ._documents import (
     BaseDocument,
-    Document,
     DocumentIndex,
     DocumentIndexType,
-    DocumentTimeStampedModel,
-    DocumentTimeStampedVersionedModel,
-    DocumentVersionModel,
+)
+from .mongo import (
+    MongoDocument,
+    MongoDocumentTimeStampedModel,
+    MongoDocumentTimeStampedVersionedModel,
+    MongoDocumentVersionModel,
     MongoView,
 )
+from .qdrant import QdrantDocument, QdrantTimeStampedDocument

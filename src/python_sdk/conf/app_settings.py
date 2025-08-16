@@ -1,4 +1,5 @@
 import logging
+from functools import cached_property
 from pathlib import Path
 from typing import Annotated, Any, Optional, Union
 
@@ -19,6 +20,7 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 from pytz import timezone as tz
+from urllib3.util import parse_url
 
 PathField = Annotated[Path, BeforeValidator(lambda x: Path(x))]
 
@@ -65,7 +67,7 @@ class MongoSettings(BaseSettings):
     db_name: str = Field(default="staging", description="MongoDB database name")
     index_dimensions: int = Field(default=3072, description="The index dimensions")
 
-    @property
+    @cached_property
     def dsn(self) -> MongoDsn:
         return MongoDsn(self.url)
 
@@ -77,13 +79,24 @@ class PostgresSettings(BaseSettings):
         cli_prefix="postgres_",
     )
     url: str = Field(
-        default="postgresql://localhost:5432/chatwoot_dev",
+        default="postgresql://postgres:postgres@localhost:5432/postgres",
         description="Postgres URL",
     )
 
     use_ssl: BooleanField = Field(default=False, description="Use SSL")
 
+    migrations_dir: Optional[PathField] = Field(
+        default=None,
+        title="Migration directory",
+        description="The directory for database migrations",
+    )
+
     @property
+    def migrations_dir_path(self) -> Path:
+
+        return Path(self.migrations_dir).resolve() if self.migrations_dir else Path.cwd() / "migrations"
+
+    @cached_property
     def dsn(self) -> PostgresDsn:
         return PostgresDsn(self.url)
 
@@ -109,6 +122,46 @@ class PostgresSettings(BaseSettings):
             "url": url,
             "use_ssl": use_ssl,
         }
+
+
+class QdrantSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        **base_model_config,
+        env_prefix="qdrant_",
+        cli_prefix="qdrant_",
+    )
+    url: str = Field(
+        default="http://127.0.0.1:6334",
+        title="QDrant URL",
+        description="The QDrant URL, e.g., http://localhost:6333 or http://localhost:6334",
+    )
+
+    port: int = Field(
+        default=6333,
+        title="Port",
+        description="The port for the QDrant server, e.g., 6333 or 6334",
+    )
+
+    grpc_port: int = Field(
+        default=6334,
+        title="GrpcPort",
+        description="The gRPC port for the QDrant server, e.g., 6334",
+    )
+
+    prefer_grpc: BooleanField = Field(
+        default=True,
+        title="Prefer GRPC mode",
+        description="If true, the QDrant server will use prefer GRPC mode.",
+    )
+    default_vector_size: int = Field(
+        default=768,
+        title="Vector Size",
+        description="The size of the vectors in the vector store",
+    )
+
+    @cached_property
+    def host(self) -> str:
+        return parse_url(self.url).host or "127.0.0.1"
 
 
 class BrokerSettings(BaseSettings):
@@ -197,6 +250,23 @@ class KubernetesSettings(BaseSettings):
         return value
 
 
+class LLMSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        **base_model_config,
+        env_prefix="llm_",
+        cli_prefix="llm_",
+        title="LLM Settings",
+    )
+    model_name: str = Field(
+        default="llama3:8b", description="The LLM model to use"
+    )
+
+    api_url: str = Field(
+        default="http://localhost:11434/api/generate", description="The LLM API URL"
+    )
+
+    api_token: str = Field(default_factory=str, title="The LLM API token", description="The LLM API token")
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(**base_model_config)
     env: str = Field(
@@ -222,6 +292,8 @@ class Settings(BaseSettings):
     mongo: MongoSettings = MongoSettings()
     postgres: PostgresSettings = PostgresSettings()
     kube: KubernetesSettings = KubernetesSettings()
+    qdrant: QdrantSettings = QdrantSettings()
+    llm: LLMSettings = LLMSettings()
 
     @property
     def is_dev(self) -> bool:

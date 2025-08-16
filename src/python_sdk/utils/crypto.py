@@ -5,12 +5,13 @@ import secrets
 import string
 import time
 from abc import ABC
-from typing import AnyStr, Literal, Optional, Union
+from datetime import UTC, datetime
+from typing import Literal, Optional, Union
 from uuid import UUID
 
 from bson.objectid import ObjectId
 
-from .strings import Strings
+from .strings import AnyStr, Strings
 
 
 class Crypto(ABC):  # noqa
@@ -184,6 +185,29 @@ class Crypto(ABC):  # noqa
         )
 
         return "".join(f"{b:02x}" for b in uuid_bytes).upper()
+
+    @staticmethod
+    def uuid7_to_datetime(uuid: AnyStr) -> Optional[datetime]:
+        """
+        Extract the datetime from a UUIDv7 string.
+
+        Args:
+            uuid (str): The UUIDv7 string (hex, with or without dashes).
+
+        Returns:
+            datetime: The extracted UTC datetime.
+        """
+
+        if not uuid:
+            return None
+        clean_hex = Strings.to_str(uuid).replace("-", "")
+
+        if len(clean_hex) != 32:
+            raise ValueError("Invalid UUID string length")
+
+        timestamp_ms = int(clean_hex[:12], 16)
+
+        return datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
 
     @staticmethod
     def generate_unique_secure_token(length: Optional[int] = 24) -> str:

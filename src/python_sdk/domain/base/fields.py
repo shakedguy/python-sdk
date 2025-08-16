@@ -17,7 +17,7 @@ from pydantic_core.core_schema import (
     ValidationInfo,
 )
 
-from ...utils import Crypto, DateTime
+from ...utils import Crypto, DateTime, Strings
 
 T = TypeVar("T")
 
@@ -32,8 +32,6 @@ JSONPrimitive = Union[str, int, float, bool, None]
 JSONObject = dict[str, JSONPrimitive]
 
 JSONArray = list[JSONPrimitive]
-
-JSONValue = Union[JSONPrimitive | JSONObject | JSONArray]
 
 JSONPayload = Union[JSONObject | JSONArray]
 
@@ -72,8 +70,22 @@ TimeOnlyStrField: Optional[str] = Annotated[
     ),
 ]
 
-EntityIDField: Optional[int] = Annotated[
-    Optional[int], BeforeValidator(lambda x: int(x) if x else None)
+
+def _parse_entity_id(value: Any) -> Optional[Union[int, str]]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, (ObjectId, DocumentID, UUID)):
+        return str(value)
+    if isinstance(value, (str, bytes, bytearray, memoryview)):
+        val = Strings.to_str(value)
+        return int(val) if val.isnumeric() else val
+    return str(value)
+
+
+EntityIDField: Optional[Union[int, str]] = Annotated[
+    Optional[Union[int, str]], BeforeValidator(_parse_entity_id)
 ]
 
 
@@ -96,14 +108,14 @@ FloatField: Optional[float] = Annotated[
 ]
 
 
-def _parse_json_field(value: Any) -> JsonValue:
+def _parse_json_field(value: Any) -> Optional[JsonValue] :
     if isinstance(value, (str, bytes, bytearray, memoryview)):
         try:
             return from_json(value)
         except ValueError:
             pass
 
-    return value
+    return value if isinstance(value, JsonValue) else None
 
 
 JsonObjectField: Optional[JSONObject] = Annotated[
@@ -124,7 +136,7 @@ JsonArrayField: Optional[list[dict[str, Any]]] = Annotated[
 JsonField: JsonValue = Annotated[JsonValue, BeforeValidator(_parse_json_field)]
 
 UUIDField: Optional[str] = Annotated[
-    Optional[str], BeforeValidator(lambda x: str(x or Crypto.uuid7()))
+    Optional[str], BeforeValidator(lambda x: str(x) if x is not None else None)
 ]
 
 plain_validator = (

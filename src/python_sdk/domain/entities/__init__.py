@@ -1,16 +1,71 @@
-from typing import Any, LiteralString, cast
+from typing import Any, Collection, LiteralString, Optional, Sequence, cast
 
 from pydantic import Field
 
 from ...errors import NoIdError
 from ...orm.sql.commands import SQLCommandsMixin
 from ...orm.sql.queries import SQLQueriesMixin
-from ...utils import DateTime, Strings
+from ...utils import DateTime, Strings, enums
 from ..base.base_model import BaseModel
 from ..base.fields import DateTimeField, EntityIDField
 
 
+class EntityIndexType(enums.StrEnum):
+    BTREE = "btree"
+    HASH = "hash"
+    GIST = "gist"
+    GIN = "gin"
+    SPGIST = "spgist"
+    BRIN = "brin"
+
+    @property
+    def sql_value(self) -> str:
+        mapping = {
+            EntityIndexType.BTREE: "btree",
+            EntityIndexType.HASH: "hash",
+            EntityIndexType.GIST: "gist",
+            EntityIndexType.GIN: "gin",
+            EntityIndexType.SPGIST: "spgist",
+            EntityIndexType.BRIN: "brin",
+        }
+        return mapping[self]
+
+
+class EntityIndex(BaseModel):
+    """
+    Represents an index for an SQL entity.
+    This class defines the structure of an index, including its name, type, and columns.
+    It is used to create and manage indexes in SQL databases.
+
+    Attributes:
+        name (str): The name of the index.
+        unique (Optional[bool]): Indicates if the index is unique.
+        type (EntityIndexType): The type of the index, such as BTREE or HASH
+        columns (Sequence[str]): The columns that the index is built on.
+    Example:
+        index = EntityIndex(
+            name="my_index",
+            unique=True,
+            type=EntityIndexType.BTREE,
+            columns=["column1", "column2"]
+        )
+    """
+
+    name: str = Field(..., title="Name", description="The index name.")
+
+    unique: Optional[bool] = Field(
+        default=False, title="Unique", description="The index is unique."
+    )
+    type: EntityIndexType = Field(default=EntityIndexType.BTREE, title="Type", description="The index type.")
+
+    columns: Sequence[str] = Field(..., title="Keys", description="The index keys.")
+
+
 class BaseEntity(BaseModel):
+    class Meta:
+        table_name: str = ""
+        indexes: Collection[EntityIndex] = list()
+
     id: EntityIDField = Field(
         default=None, title="Id", description="The primary key of the table."
     )
@@ -22,8 +77,8 @@ class BaseEntity(BaseModel):
     @classmethod
     def get_table_name(cls) -> str:
         return getattr(
-            cls,
-            "__tablename__",
+            cls.Meta,
+            "table_name",
             Strings.to_snake_case(Strings.to_plural(cls.__name__)),
         )
 
