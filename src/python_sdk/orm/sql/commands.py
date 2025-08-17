@@ -33,71 +33,78 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if created:
             self._update_instance_attributes(created)
 
-    def create(self, entity: EntityType) -> Optional[Self]:
+    @classmethod
+    def create(cls, entity: EntityType) -> Optional[Self]:
         """
         Create a new record in the database.
         """
         if not entity:
             return None
-        sql, params = self._build_create(entity)
-        return self._execute_sync_query(sql, params)
+        sql, params = cls._build_create(entity)
+        return cls._execute_sync_query(sql, params)
 
-    async def create_async(self, entity: EntityType) -> Optional[Self]:
+    @classmethod
+    async def create_async(cls, entity: EntityType) -> Optional[Self]:
         """
         Asynchronously create a new record in the database.
         """
         if not entity:
             return None
-        sql, params = self._build_create(entity, placeholder="index")
-        return await self._execute_async_query(sql, params)
+        sql, params = cls._build_create(entity, placeholder="index")
+        return await cls._execute_async_query(sql, params)
 
-    def update(self, pk: Union[int, str], entity: EntityType) -> Optional[Self]:
+    @classmethod
+    def update(cls, pk: Union[int, str], entity: EntityType) -> Optional[Self]:
         """
         Update an existing record in the database.
         """
         if not entity:
             return None
-        sql, params = self._build_update(pk, entity)
-        return self._execute_sync_query(sql, params)
+        sql, params = cls._build_update(pk, entity)
+        return cls._execute_sync_query(sql, params)
 
+    @classmethod
     async def update_async(
-        self, pk: Union[int, str], entity: EntityType
+        cls, pk: Union[int, str], entity: EntityType
     ) -> Optional[EntityType]:
         """
         Asynchronously update an existing record in the database.
         """
         if not entity:
             return None
-        sql, params = self._build_update(pk, entity, placeholder="index")
-        return await self._execute_async_query(sql, params)
+        sql, params = cls._build_update(pk, entity, placeholder="index")
+        return await cls._execute_async_query(sql, params)
 
-    def delete(self, pk: Union[str, int]) -> int:
+    @classmethod
+    def delete(cls, pk: Union[str, int]) -> int:
         """
         Delete a record from the database by primary key.
         """
-        sql = self._build_delete(pk)
-        return self._execute_sync_query(sql).rowcount
+        sql = cls._build_delete(pk)
+        return cls._execute_sync_query(sql).rowcount
 
-    async def delete_async(self, pk: Union[str, int]) -> int:
+    @classmethod
+    async def delete_async(cls, pk: Union[str, int]) -> int:
         """
         Asynchronously delete a record from the database by primary key.
         """
-        sql = self._build_delete(pk)
-        result = await self._execute_async_query(sql)
+        sql = cls._build_delete(pk)
+        result = await cls._execute_async_query(sql)
         return int(result.rowcount)
 
+    @classmethod
     def _build_create(
-        self,
+        cls,
         entity: EntityType,
         placeholder: Optional[Literal["index", "string"]] = None,
     ) -> tuple[str, Any]:
         """
         Build the SQL query for creating a new record.
         """
-        self.before_create(entity)
-        columns = self.get_columns()
+        entity.before_create()
+        columns = entity.get_columns()
         values_names = ", ".join(columns)
-        params = self._parse_values(
+        params = cls._parse_values(
             **entity.model_dump(include=columns), cast_json=placeholder != "index"
         )
         values = ", ".join(
@@ -106,13 +113,14 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
                 for idx, col in enumerate(columns)
             ]
         )
-        sql = f"INSERT INTO {self.get_table_name()} ({values_names}) VALUES ({values}) RETURNING *"
+        sql = f"INSERT INTO {entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING *"
         return sql, [
             params.get(col) for col in columns
         ] if placeholder == "index" else params
 
+    @classmethod
     def _build_update(
-        self,
+        cls,
         pk: Union[int, str],
         entity: EntityType,
         placeholder: Optional[Literal["index", "string"]] = None,
@@ -120,16 +128,16 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         """
         Build the SQL query for updating an existing record.
         """
-        self.before_update(entity)
-        pk = self._validate_pk(pk)
-        params = self._parse_values(
+        cls.before_update(entity)
+        pk = cls._validate_pk(pk)
+        params = cls._parse_values(
             **entity.model_dump(
                 exclude={"id", "account", "inboxes"},
                 exclude_unset=True,
                 exclude_defaults=True,
             )
         )
-        if "updated_at" in self.get_columns():
+        if "updated_at" in cls.get_columns():
             params["updated_at"] = DateTime.now()
         columns = sorted(params.keys())
         values = ", ".join(
@@ -140,19 +148,21 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
                 for idx, col in enumerate(columns)
             ]
         )
-        sql = f"UPDATE {self.get_table_name()} SET {values} WHERE id = {pk} RETURNING *"
+        sql = f"UPDATE {cls.get_table_name()} SET {values} WHERE id = {pk} RETURNING *"
         return sql, [
             params.get(col) for col in columns
         ] if placeholder == "index" else params
 
-    def _build_delete(self, pk: Union[str, int]) -> str:
+    @classmethod
+    def _build_delete(cls, pk: Union[str, int]) -> str:
         """
         Build the SQL query for deleting a record by primary key.
         """
-        pk = self._validate_pk(pk)
-        return f"DELETE FROM {self.get_table_name()} WHERE id = {pk}"
+        pk = cls._validate_pk(pk)
+        return f"DELETE FROM {cls.get_table_name()} WHERE id = {pk}"
 
-    def _validate_pk(self, pk: Union[int, str]) -> int:
+    @classmethod
+    def _validate_pk(cls, pk: Union[int, str]) -> int:
         """
         Validate the primary key to ensure it is a positive integer.
         """
@@ -160,23 +170,26 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
             raise ValueError("Invalid ID. Must be a positive integer.")
         return int(pk)
 
-    def _update_instance_attributes(self, created: Any) -> None:
+    @classmethod
+    def _update_instance_attributes(cls, created: Any) -> None:
         """
         Update the instance attributes with the values from the created record.
         """
         for key, value in vars(created).items():
             if isinstance(value, ObjectId):
                 value = DocumentID(str(value))
-            setattr(self, key, value)
+            setattr(cls, key, value)
 
-    def _execute_sync_query(self, sql: str, params: Any = None) -> Any:
+    @classmethod
+    def _execute_sync_query(cls, sql: str, params: Any = None) -> Any:
         """
         Execute a synchronous SQL query.
         """
         with Postgres() as db:
             return db.execute(query=sql, params=params).fetchone()
 
-    async def _execute_async_query(self, sql: str, params: Any = None) -> Any:
+    @classmethod
+    async def _execute_async_query(cls, sql: str, params: Any = None) -> Any:
         """
         Execute an asynchronous SQL query.
         """
