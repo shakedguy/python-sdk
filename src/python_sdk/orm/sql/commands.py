@@ -19,19 +19,22 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         """
         Save the current instance to the database.
         """
-        created = self.update(self.id, self) if self.id else self.create(self)
-        if created:
+        if self.id is None:
+            created = self.create(self)
             self._update_instance_attributes(created)
+        else:
+            self.update(self.id, self)
+
 
     async def save_async(self) -> None:
         """
         Asynchronously save the current instance to the database.
         """
-        created = await (
-            self.update_async(self.id, self) if self.id else self.create_async(self)
-        )
-        if created:
+        if self.id is None:
+            created = self.create_async(self)
             self._update_instance_attributes(created)
+        else:
+            await self.update_async(self.id, self)
 
     @classmethod
     def create(cls, entity: EntityType) -> Optional[Self]:
