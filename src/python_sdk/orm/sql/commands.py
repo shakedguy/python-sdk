@@ -162,13 +162,13 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         return f"DELETE FROM {cls.get_table_name()} WHERE id = {pk}"
 
     @classmethod
-    def _validate_pk(cls, pk: Union[int, str]) -> int:
+    def _validate_pk(cls, pk: Union[int, str]) -> Union[int, str]:
         """
         Validate the primary key to ensure it is a positive integer.
         """
-        if not str(pk).isdigit() or int(pk) <= 0:
-            raise ValueError("Invalid ID. Must be a positive integer.")
-        return int(pk)
+        if not pk or str(pk) == "":
+            raise ValueError("ID cannot be empty or None.")
+        return int(pk) if str(pk).isdigit() else pk
 
     @classmethod
     def _update_instance_attributes(cls, created: Any) -> None:
