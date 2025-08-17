@@ -104,7 +104,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         """
         Build the SQL query for creating a new record.
         """
-        entity.before_create()
+        entity.before_insert()
         columns = entity.get_columns()
         values_names = ", ".join(columns)
         params = cls._parse_values(
