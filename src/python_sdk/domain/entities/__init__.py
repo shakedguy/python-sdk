@@ -119,6 +119,14 @@ class SQLModel(BaseEntity, SQLQueriesMixin, SQLCommandsMixin):
             setattr(self, k, v)
 
 
+    def before_update(self) -> None: ...
+
+    def before_insert(self) -> None: ...
+
+    async def before_update_async(self) -> None: ...
+
+    async def before_insert_async(self) -> None: ...
+
 class SQLTimeStampedModel(SQLModel):
     """
     SQL Model with timestamp fields for creation and updates.
@@ -134,3 +142,23 @@ class SQLTimeStampedModel(SQLModel):
         title="Updated At",
         description="The date and time the record was last updated.",
     )
+
+    @override  # noqa
+    def before_update(self) -> None:
+        super().before_update()
+        self.updated_at = DateTime.now()
+
+    @override  # noqa
+    def before_insert(self) -> None:
+        super().before_insert()
+        self.created_at = DateTime.now()
+
+    @override  # noqa
+    async def before_update_async(self) -> None:
+        await super().before_update_async()
+        self.updated_at = DateTime.now()
+
+    @override  # noqa
+    async def before_insert_async(self) -> None:
+        await super().before_insert_async()
+        self.created_at = DateTime.now()
