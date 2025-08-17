@@ -1,4 +1,4 @@
-from typing import Any, Collection, LiteralString, Optional, Sequence, cast
+from typing import Any, Collection, LiteralString, Optional, Sequence, cast, override
 
 from pydantic import Field
 
