@@ -44,31 +44,47 @@ def to_datetime(value: Any) -> Optional[datetime]:
     return DateTime.to_datetime(value)
 
 
-DateTimeField: Optional[datetime] = Annotated[
+DateTimeField = Annotated[
     Optional[datetime],
     BeforeValidator(to_datetime),
 ]
 
-DateTimeISOStrField: str = Annotated[
+DateTimeISOStrField = Annotated[
     Optional[str],
     BeforeValidator(
         lambda x: DateTime.to_datetime(x).isoformat() if x else DateTime.iso_now()
     ),
 ]
 
-DateOnlyStrField: Optional[str] = Annotated[
+DateOnlyStrField = Annotated[
     Optional[str],
     BeforeValidator(
         lambda x: DateTime.to_date_only(x).strftime("%Y-%m-%d") if x else None
     ),
 ]
 
-TimeOnlyStrField: Optional[str] = Annotated[
+TimeOnlyStrField = Annotated[
     Optional[str],
     BeforeValidator(
         lambda x: DateTime.to_time_only(x).strftime("%H:%M:%S") if x else None
     ),
 ]
+
+
+def _parse_timestamp(value: Any) -> datetime:
+    if not value:
+        return DateTime.utc_now()
+    try:
+
+        if isinstance(value, datetime):
+            return value
+        return DateTime.to_datetime(value)
+    except (ValueError, TypeError):
+        pass
+    return DateTime.utc_now()
+
+
+TimestampField = Annotated[datetime, BeforeValidator(_parse_timestamp)]
 
 
 def _parse_entity_id(value: Any) -> Optional[Union[int, str]]:
@@ -84,7 +100,7 @@ def _parse_entity_id(value: Any) -> Optional[Union[int, str]]:
     return str(value)
 
 
-EntityIDField: Optional[Union[int, str]] = Annotated[
+EntityIDField = Annotated[
     Optional[Union[int, str]], BeforeValidator(_parse_entity_id)
 ]
 
@@ -99,16 +115,16 @@ def to_default_entity_id(value: Any) -> Union[str, int]:
     return str(value)
 
 
-DefaultEntityIDField: Union[str, int] = Annotated[
+DefaultEntityIDField = Annotated[
     Union[str, int], BeforeValidator(to_default_entity_id)
 ]
 
-FloatField: Optional[float] = Annotated[
+FloatField = Annotated[
     Optional[float], BeforeValidator(lambda x: float(x) if x else None)
 ]
 
 
-def _parse_json_field(value: Any) -> Optional[JsonValue] :
+def _parse_json_field(value: Any) -> Optional[JsonValue]:
     if isinstance(value, (str, bytes, bytearray, memoryview)):
         try:
             return from_json(value)
@@ -118,24 +134,24 @@ def _parse_json_field(value: Any) -> Optional[JsonValue] :
     return value if isinstance(value, JsonValue) else None
 
 
-JsonObjectField: Optional[JSONObject] = Annotated[
+JsonObjectField = Annotated[
     Optional[JSONObject],
     BeforeValidator(_parse_json_field),
 ]
 
-ChannelVersionsField: dict[str, Union[str, int, float]] = Annotated[
+ChannelVersionsField = Annotated[
     Optional[dict[str, Union[str, int, float]]],
     BeforeValidator(lambda x: dict(x) if x else dict()),
 ]
 
-JsonArrayField: Optional[list[dict[str, Any]]] = Annotated[
+JsonArrayField = Annotated[
     Optional[list[dict[str, Any]]],
     BeforeValidator(_parse_json_field),
 ]
 
-JsonField: JsonValue = Annotated[JsonValue, BeforeValidator(_parse_json_field)]
+JsonField = Annotated[JsonValue, BeforeValidator(_parse_json_field)]
 
-UUIDField: Optional[str] = Annotated[
+UUIDField = Annotated[
     Optional[str], BeforeValidator(lambda x: str(x) if x is not None else None)
 ]
 
@@ -217,7 +233,7 @@ def _create_document_id(value: Any) -> Optional[DocumentID]:
     return DocumentID(str(value))
 
 
-DocumentIDField: Optional[DocumentID] = Annotated[
+DocumentIDField = Annotated[
     Optional[DocumentID],
     BeforeValidator(_create_document_id),
     PlainSerializer(
