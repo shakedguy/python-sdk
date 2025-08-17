@@ -128,7 +128,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         """
         Build the SQL query for updating an existing record.
         """
-        cls.before_update(entity)
+        entity.before_update()
         pk = cls._validate_pk(pk)
         params = cls._parse_values(
             **entity.model_dump(
