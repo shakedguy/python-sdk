@@ -105,12 +105,12 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         Build the SQL query for creating a new record.
         """
         entity.before_insert()
-        columns = list(entity.get_columns())
+        columns = entity.get_columns()
 
 
 
         if isinstance(entity.id, str) and len(entity.id) > 0:
-            columns = ["id"] + columns
+            columns = set(["id"] + list(columns))
 
         params = cls._parse_values(
             **entity.model_dump(include=columns), cast_json=placeholder != "index"
