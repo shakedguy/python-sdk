@@ -43,6 +43,7 @@ class API(FastAPI):
         init_cache: bool = False,
         init_mongo: bool = False,
         init_messaging: bool = False,
+        init_qdrant: bool = False,
         add_websocket: bool = False,
     ) -> None:
         self.debug = debug
@@ -68,6 +69,7 @@ class API(FastAPI):
                     init_cache=init_cache,
                     init_mongo=init_mongo,
                     init_messaging=init_messaging,
+                    init_qdrant=init_qdrant,
                 )
                 if before_start:
                     before_start = (
