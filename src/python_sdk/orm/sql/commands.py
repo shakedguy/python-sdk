@@ -148,7 +148,9 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
                 for idx, col in enumerate(columns)
             ]
         )
-        sql = f"UPDATE {cls.get_table_name()} SET {values} WHERE id = {pk} RETURNING *"
+
+        pk_value = pk if isinstance(pk, int) else f"'{pk}'"
+        sql = f"UPDATE {cls.get_table_name()} SET {values} WHERE id = {pk_value} RETURNING *"
         return sql, [
             params.get(col) for col in columns
         ] if placeholder == "index" else params
