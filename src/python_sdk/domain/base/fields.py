@@ -84,7 +84,11 @@ def _parse_timestamp(value: Any) -> datetime:
     return DateTime.utc_now()
 
 
-TimestampField = Annotated[datetime, BeforeValidator(_parse_timestamp)]
+TimestampField = Annotated[
+    datetime,
+    BeforeValidator(_parse_timestamp),
+    PlainSerializer(lambda x: x.timestamp())
+]
 
 
 def _parse_entity_id(value: Any) -> Optional[Union[int, str]]:
