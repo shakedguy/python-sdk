@@ -106,7 +106,12 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         """
         entity.before_insert()
         columns = entity.get_columns()
-        values_names = ", ".join(columns)
+
+
+
+        if isinstance(entity.id, str) and len(entity.id) > 0:
+            columns = ["id"] + columns
+
         params = cls._parse_values(
             **entity.model_dump(include=columns), cast_json=placeholder != "index"
         )
@@ -116,6 +121,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
                 for idx, col in enumerate(columns)
             ]
         )
+        values_names = ", ".join(columns)
         sql = f"INSERT INTO {entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING *"
         return sql, [
             params.get(col) for col in columns
