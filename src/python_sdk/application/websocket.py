@@ -4,6 +4,7 @@ from typing import Annotated, Any, Optional, TypedDict, Union
 from fastapi import Depends, WebSocket
 from fastapi.websockets import WebSocketState
 from loguru import logger
+from pydantic import BaseModel
 
 from ..utils import Crypto, memoize
 from ..utils.decorators import singleton
@@ -24,24 +25,26 @@ class ConnectionManager(object):
         self.rooms: dict[str, list[WebSocket]] = {}
 
     async def connect(
-        self, ws_client: WebSocket, client_id: Optional[Union[str, int]] = None
+            self, ws_client: WebSocket, client_id: Optional[Union[str, int]] = None
     ) -> None:
         await ws_client.accept()
         client_id = client_id or ws_client.client.host
         self.active_connections[client_id] = ws_client
 
     def disconnect(
-        self, ws_client: WebSocket, client_id: Optional[Union[str, int]] = None
+            self, ws_client: WebSocket, client_id: Optional[Union[str, int]] = None
     ) -> None:
         client_id = client_id or ws_client.client.host
         self.active_connections.pop(client_id, None)
 
     @classmethod
     async def send_personal_message(
-        cls,
-        ws_client: WebSocket,
-        message: Union[Union[str, bytes, dict[str, Any]], SocketRequest],
+            cls,
+            ws_client: WebSocket,
+            message: Union[Union[str, bytes, dict[str, Any]], SocketRequest, BaseModel],
     ) -> None:
+
+        message = message.model_dump() if isinstance(message, BaseModel) else message
         if isinstance(message, dict):
             await ws_client.send_json(data=message)
         elif isinstance(message, bytes):
@@ -49,10 +52,10 @@ class ConnectionManager(object):
         else:
             await ws_client.send_text(data=message)
 
-    async def broadcast(self, message: Union[str, bytes, dict[str, Any]]) -> None:
+    async def broadcast(self, message: Union[str, bytes, dict[str, Any], BaseModel]) -> None:
         if not self.active_connections:
             return
-
+        message = message.model_dump() if isinstance(message, BaseModel) else message
         connections = [
             conn
             for conn in self.active_connections.values()
@@ -107,10 +110,10 @@ class ConnectionManager(object):
         return response.get("data", None) if "data" in response else response
 
     async def send_request(
-        self,
-        sid: Union[str, int],
-        event: str,
-        payload: Optional[Union[str, bytes, dict[str, Any]]] = None,
+            self,
+            sid: Union[str, int],
+            event: str,
+            payload: Optional[Union[str, bytes, dict[str, Any]]] = None,
     ) -> Any:
         if sid not in self.active_connections:
             logger.error(f"Client {sid} not found in active connections")
@@ -126,7 +129,7 @@ class ConnectionManager(object):
         return await self.__request_handler(sid=sid, req=req)
 
     async def broadcast_request(
-        self, event: str, payload: Optional[Union[str, dict[str, Any]]] = None
+            self, event: str, payload: Optional[Union[str, dict[str, Any]]] = None
     ) -> list[Any]:
         req_id: str = str(Crypto.uuid7())
         self.pending_requests[req_id] = asyncio.Future()
