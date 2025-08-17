@@ -44,7 +44,9 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if not entity:
             return None
         sql, params = cls._build_create(entity)
-        return cls._execute_sync_query(sql, params)
+        result = cls._execute_sync_query(sql, params)
+
+        return cls._parse_schema(result) if result else None
 
     @classmethod
     async def create_async(cls, entity: EntityType) -> Optional[Self]:
@@ -54,7 +56,9 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if not entity:
             return None
         sql, params = cls._build_create(entity, placeholder="index")
-        return await cls._execute_async_query(sql, params)
+        result = await cls._execute_async_query(sql, params)
+
+        return cls._parse_schema(result) if result else None
 
     @classmethod
     def update(cls, pk: Union[int, str], entity: EntityType) -> Optional[Self]:
