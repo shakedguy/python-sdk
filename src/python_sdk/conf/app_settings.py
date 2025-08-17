@@ -91,6 +91,12 @@ class PostgresSettings(BaseSettings):
         description="The directory for database migrations",
     )
 
+    timeout: Optional[float]  = Field(
+        default=60,
+        title="Timeout",
+        description="The timeout for database operations in seconds",
+    )
+
     @property
     def migrations_dir_path(self) -> Path:
 
