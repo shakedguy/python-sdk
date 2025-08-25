@@ -11,6 +11,7 @@ from faststream.broker.fastapi import StreamRouter
 from loguru import logger
 from socketio import ASGIApp as SocketIOASGIApp
 from socketio import AsyncServer as SocketIOAsyncServer
+from starlette.types import Lifespan
 
 from .. import settings
 from ..conf.logger import configure_logger
@@ -25,26 +26,27 @@ LifeCycleFunction = Callable[[FastAPI], Union[Any, Awaitable[Any]]]
 
 class API(FastAPI):
     def __init__(
-        self,
-        *,
-        name: str,
-        description: Optional[str] = None,
-        version: Optional[str] = None,
-        before_start: Optional[
-            Union[LifeCycleFunction, list[LifeCycleFunction]]
-        ] = None,
-        before_finish: Optional[
-            Union[LifeCycleFunction, list[LifeCycleFunction]]
-        ] = None,
-        debug: bool = False,
-        openapi_url: Optional[str] = "/openapi.json",
-        docs_url: Optional[str] = "/docs",
-        init_postgres: bool = False,
-        init_cache: bool = False,
-        init_mongo: bool = False,
-        init_messaging: bool = False,
-        init_qdrant: bool = False,
-        add_websocket: bool = False,
+            self,
+            *,
+            name: str,
+            description: Optional[str] = None,
+            version: Optional[str] = None,
+            lifespan: Optional[Lifespan] = None,
+            before_start: Optional[
+                Union[LifeCycleFunction, list[LifeCycleFunction]]
+            ] = None,
+            before_finish: Optional[
+                Union[LifeCycleFunction, list[LifeCycleFunction]]
+            ] = None,
+            debug: bool = False,
+            openapi_url: Optional[str] = "/openapi.json",
+            docs_url: Optional[str] = "/docs",
+            init_postgres: bool = False,
+            init_cache: bool = False,
+            init_mongo: bool = False,
+            init_messaging: bool = False,
+            init_qdrant: bool = False,
+            add_websocket: bool = False,
     ) -> None:
         self.debug = debug
         self.sio: Optional[SocketIOAsyncServer] = None
@@ -102,7 +104,7 @@ class API(FastAPI):
             debug=debug,
             openapi_url=openapi_url,
             docs_url=docs_url,
-            lifespan=_lifespan,
+            lifespan=lifespan or _lifespan,
         )
         self.add_exception_handler(HTTPException, http_exception_handler)
         self.add_middleware(
@@ -118,14 +120,14 @@ class API(FastAPI):
 
     @classmethod
     def run(
-        cls,
-        app_path: str,
-        *,
-        host: str = "0.0.0.0",
-        port: int = 8000,
-        reload: bool = False,
-        workers: int = 1,
-        log_level: Union[str, int] = "INFO",
+            cls,
+            app_path: str,
+            *,
+            host: str = "0.0.0.0",
+            port: int = 8000,
+            reload: bool = False,
+            workers: int = 1,
+            log_level: Union[str, int] = "INFO",
     ) -> None:
         configure_logger()
 
@@ -144,15 +146,15 @@ class API(FastAPI):
         )
 
     def add_socketio(
-        self,
-        *,
-        socketio_path: str = "/socket.io",
-        socketio_on_connect: Optional[
-            Callable[[str, dict, dict], Union[Any, Awaitable[Any]]]
-        ] = None,  # noqa
-        socketio_on_disconnect: Optional[
-            Callable[[str], Union[Any, Awaitable[Any]]]
-        ] = None,
+            self,
+            *,
+            socketio_path: str = "/socket.io",
+            socketio_on_connect: Optional[
+                Callable[[str, dict, dict], Union[Any, Awaitable[Any]]]
+            ] = None,  # noqa
+            socketio_on_disconnect: Optional[
+                Callable[[str], Union[Any, Awaitable[Any]]]
+            ] = None,
     ) -> None:
         self.sio, self.sio_app = create_socketio_app(
             enable_logging=self.debug,
