@@ -73,9 +73,9 @@ class API(FastAPI):
                 )
                 if before_start:
                     before_start = (
-                        [to_async(f) for f in before_start]
+                        [to_async(f)(_app) for f in before_start]
                         if isinstance(before_start, list)
-                        else [to_async(before_start)]
+                        else [to_async(before_start)(_app)]
                     )
                     await asyncio.gather(*before_start)
 
@@ -89,9 +89,9 @@ class API(FastAPI):
                 await cleanup_async()
                 if before_finish:
                     before_finish = (
-                        [to_async(f) for f in before_finish]
+                        [to_async(f)(_app) for f in before_finish]
                         if isinstance(before_finish, list)
-                        else [to_async(before_finish)]
+                        else [to_async(before_finish)(_app)]
                     )
                     await asyncio.gather(*before_finish)
 
