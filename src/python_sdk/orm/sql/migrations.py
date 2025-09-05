@@ -25,6 +25,7 @@ class ORMOperation(enums.StrEnum):
     MIGRATIONS = "migrations"
     MIGRATE = "migrate"
     STATUS = "status"
+    CLEAR = "clear"
 
 
 class ORMSubcommand(enums.StrEnum):
@@ -195,6 +196,7 @@ def main(
         files = list_migrations(migrations_dir=dir_path)
         applied = get_applied(cur)
         not_applied = [p for p in files if p.stem not in applied]
+        applied_files = [p for p in files if p.stem in applied]
         if operation == ORMOperation.STATUS:
             print_status(cur=cur, files=files, applied=applied)
             return
@@ -240,15 +242,15 @@ def main(
                     apply_one(conn, cur, path)
             print("All migrations applied successfully.")
             return
-            # elif cmd == ORMSubcommand.DOWNGRADE:
-            #     if not files:
-            #         print("No migrations found.")
-            #         return
-            #     for path in reversed(files):
-            #         rollback_one(cur, path)
-            #     print("All migrations rolled back successfully.")
-            #
-            # else:
-            #     raise ValueError(f"Unknown command: {cmd}")
+        elif operation == ORMOperation.STATUS:
+            print_status(cur=cur, files=files, applied=applied)
+            return
+        elif operation == ORMOperation.CLEAR:
+
+            for path in applied_files:
+                rollback_one(cur, path, fake=dry)
+            cur.execute("DROP TABLE IF EXISTS schema_migrations;")
+            print("Cleared all migrations and dropped bookkeeping table.")
+            return
 
         raise ValueError(f"Unknown operation: {operation}")
