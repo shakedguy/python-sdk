@@ -57,7 +57,7 @@ class QdrantDocument(BaseDocument, QdrantQueriesMixin, QdrantCommandsMixin):
 
     @cached_property
     def created_at(self) -> Optional[datetime]:
-        return Crypto.uuid7_to_datetime(self.id) if self.id else None
+        return Crypto.uuidv7_to_datetime(self.id) if self.id else None
 
     @staticmethod
     def get_all_documents() -> Collection[Type[QdrantDocument]]:

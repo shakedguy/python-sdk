@@ -39,7 +39,7 @@ class NewMessageRequest(BaseModel):
 
 class RequestEvent(BaseModel):
     id: Optional[UUIDField] = Field(
-        default_factory=Crypto.uuid7, title="The unique identifier of the event"
+        default_factory=Crypto.uuidv7, title="The unique identifier of the event"
     )
     type: Literal["req"]
     agent: Optional[str] = Field(default_factory=str, title="The agent of the event")
@@ -125,7 +125,7 @@ class ResponseData(BaseModel):
 
 class ResponseEvent(BaseModel):
     id: Optional[UUIDField] = Field(
-        default_factory=Crypto.uuid7, title="The unique identifier of the event"
+        default_factory=Crypto.uuidv7, title="The unique identifier of the event"
     )
     type: Literal["res"]
     agent: Optional[str] = Field(default_factory=str, title="The agent of the event")

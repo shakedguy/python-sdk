@@ -19,7 +19,7 @@ class BaseMessageBody(BaseModel):
     """
 
     id: UUIDField = Field(
-        default_factory=Crypto.uuid7,
+        default_factory=Crypto.uuidv7,
         title="Message ID",
         description="The unique identifier of the message",
     )
@@ -50,7 +50,7 @@ class BaseMessage(BaseModel, Generic[MessageBody]):
     """
 
     id: UUIDField = Field(
-        default_factory=Crypto.uuid7,
+        default_factory=Crypto.uuidv7,
         title="Message ID",
         description="The unique identifier of the message",
     )
@@ -77,7 +77,7 @@ class BaseMessage(BaseModel, Generic[MessageBody]):
             return value
 
         value = base_validate_before(value)
-        value.setdefault("id", Crypto.uuid7())
+        value.setdefault("id", Crypto.uuidv7())
         value.setdefault("timestamp", DateTime.utc_now())
         value.setdefault("data", dict())
         value["data"]["id"] = value["data"].get("id", value["id"])

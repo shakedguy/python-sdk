@@ -111,7 +111,7 @@ EntityIDField = Annotated[
 
 def to_default_entity_id(value: Any) -> Union[str, int]:
     if value is None or isinstance(value, (UUID, str)):
-        return value or Crypto.uuid7()
+        return value or Crypto.uuidv7()
     if isinstance(value, (int, float)):
         return int(value)
     if isinstance(value, (bytes, bytearray, memoryview)):

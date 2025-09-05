@@ -44,7 +44,7 @@ class QdrantCommandsMixin(Generic[DocumentType]):
         entity = cls.model_validate(entity)
         entity.before_insert()
         with Qdrant() as client:
-            _id = Crypto.uuid7()
+            _id = Crypto.uuidv7()
             data = entity.model_dump(mode="json", exclude={"id"})
             data.pop("_id", None)
             data["id"] = str(_id)
@@ -70,7 +70,7 @@ class QdrantCommandsMixin(Generic[DocumentType]):
         entity = cls.model_validate(entity)
         await entity.before_insert_async()
         async with Qdrant() as client:
-            _id = Crypto.uuid7()
+            _id = Crypto.uuidv7()
             data = entity.model_dump(mode="json", exclude={"id"})
             data.pop("_id", None)
             data["id"] = str(_id)

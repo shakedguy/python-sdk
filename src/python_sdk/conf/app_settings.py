@@ -251,7 +251,7 @@ class KubernetesSettings(BaseSettings):
         if not value:
             from ..utils import Crypto
 
-            value = f"pod-{Crypto.uuid7()}"
+            value = f"pod-{Crypto.uuidv7()}"
 
         return value
 

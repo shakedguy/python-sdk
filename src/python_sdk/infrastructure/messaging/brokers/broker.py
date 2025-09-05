@@ -69,7 +69,7 @@ class Broker(object):
 
         connection_name = connection_name or "buzzerpy"
         self.connection_name: Optional[str] = (
-            f"{Strings.slugify(connection_name)}:{Crypto.uuid7()[:12]}"
+            f"{Strings.slugify(connection_name)}:{Crypto.uuidv7()[:12]}"
         )
         self._broker: Union[RabbitBroker, RedisBroker, KafkaBroker]
 
@@ -460,7 +460,7 @@ class KafkaRPCWorker:
         headers: Optional[dict[str, str]] = None,
         **kwargs,
     ) -> bytes:
-        correlation_id = Crypto.uuid7()
+        correlation_id = Crypto.uuidv7()
         future = self.responses[correlation_id] = Future[bytes]()
 
         await self.broker.publish(
@@ -483,7 +483,7 @@ class KafkaRPCWorker:
 
 class BrokerMessage(BaseModel):
     message_id: str = Field(
-        default_factory=Crypto.uuid7,
+        default_factory=Crypto.uuidv7,
         title="Message ID",
         description="Unique identifier for the message",
     )
