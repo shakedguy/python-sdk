@@ -89,12 +89,12 @@ class Crypto(ABC):  # noqa
 
     @classmethod
     def generate_random_id(
-        cls,
-        length: int,
-        *,
-        simbols: bool = False,
-        encoding: Literal["ascii", "hex", "base64"] = "ascii",
-        case: Optional[Literal["upper", "lower"]] = None,
+            cls,
+            length: int,
+            *,
+            simbols: bool = False,
+            encoding: Literal["ascii", "hex", "base64"] = "ascii",
+            case: Optional[Literal["upper", "lower"]] = None,
     ) -> str:
         """
         Generates a random ID of the specified length.
@@ -125,7 +125,7 @@ class Crypto(ABC):  # noqa
 
     @classmethod
     def generate_random_token(
-        cls, size: int, base: Literal["binary", "octal", "hex", "decimal", "base-64"]
+            cls, size: int, base: Literal["binary", "octal", "hex", "decimal", "base-64"]
     ) -> str:
         """
         Generates a random token of the specified size and base.
@@ -166,28 +166,42 @@ class Crypto(ABC):  # noqa
         """
         return hashlib.md5(content.encode()).hexdigest()
 
-    @classmethod
-    def uuid7(cls) -> str:
+    @staticmethod
+    def to_stable_uuid(*parts: AnyStr) -> str:
+        """
+        Converts multiple parts into a stable UUID string.
+        Args:
+            *parts (AnyStr): The parts to combine into a UUID.
+        Returns:
+            str: The stable UUID string.
+        """
+        if not parts:
+            return ""
+        h = hashlib.md5("|".join(parts).encode()).hexdigest()
+        return str(UUID(hex=h.lower())).upper()
+
+    @staticmethod
+    def uuidv7() -> str:
         """
         Generates a UUID version 7 string.
 
         Returns:
             str: The generated UUID version 7 string.
         """
+
         timestamp = int(time.time() * 1000)
         random_bytes = os.urandom(10)
 
         uuid_bytes = (
-            timestamp.to_bytes(6, byteorder="big")
-            + bytes([(random_bytes[0] & 0x0F) | 0x70])
-            + bytes([(random_bytes[1] & 0x3F) | 0x80])
-            + random_bytes[2:]
+                timestamp.to_bytes(6, byteorder="big")
+                + bytes([(random_bytes[0] & 0x0F) | 0x70])
+                + bytes([(random_bytes[1] & 0x3F) | 0x80])
+                + random_bytes[2:]
         )
-
-        return "".join(f"{b:02x}" for b in uuid_bytes).upper()
+        return str(UUID(bytes=uuid_bytes))
 
     @staticmethod
-    def uuid7_to_datetime(uuid: AnyStr) -> Optional[datetime]:
+    def uuidv7_to_datetime(uuid: AnyStr) -> Optional[datetime]:
         """
         Extract the datetime from a UUIDv7 string.
 
