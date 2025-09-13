@@ -1,4 +1,5 @@
-from typing import Any, Generic, Literal, Optional, Self, TypeVar, Union
+import asyncio
+from typing import Any, Collection, Generic, Literal, Optional, Self, TypeVar, Union
 
 from bson.objectid import ObjectId
 from pydantic import BaseModel
@@ -23,10 +24,10 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
 
         _id = getattr(self, "id", None)
         if _id is None:
-            created = self.create(self) # type: ignore
+            created = self.create(self)  # type: ignore
             self._update_instance_attributes(created)
         else:
-            self.update(_id, self) # type: ignore
+            self.update(_id, self)  # type: ignore
 
     async def save_async(self) -> None:
         """
@@ -36,10 +37,10 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         _id = getattr(self, "id", None)
 
         if _id is None:
-            created = self.create_async(self) # type: ignore
+            created = self.create_async(self)  # type: ignore
             self._update_instance_attributes(created)
         else:
-            await self.update_async(_id, self) # type: ignore
+            await self.update_async(_id, self)  # type: ignore
 
     @classmethod
     def create(cls, entity: EntityType) -> Optional[Self]:
@@ -53,7 +54,60 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         sql, params = cls._build_create(entity)
         result = cls._execute_sync_query(sql, params)
 
-        return cls._parse_schema(result) if result else None # type: ignore
+        return cls._parse_schema(result) if result else None  # type: ignore
+
+    @classmethod
+    def create_many(cls, entities: Collection[EntityType]) -> Optional[Union[list[str], list[int]]]:
+        """
+        Create multiple new records in the database.
+        """
+        if not entities:
+            return None
+        for entity in entities:
+            if hasattr(entity, "before_insert"):
+                entity.before_insert()
+        sql, params = cls._build_create_many(list(entities))
+        with Postgres() as db:
+            result = db.execute(query=sql, params=params).fetchall()  # type: ignore
+
+        if result:
+            return [
+                int(row['id'])
+                if isinstance(row['id'], str) and str(row["id"]).isnumeric()
+                else row['id']
+                for row in result
+            ]
+        return None
+
+    @classmethod
+    async def create_many_async(cls, entities: Collection[EntityType]) -> Optional[Union[list[str], list[int]]]:
+        """
+        Asynchronously create multiple new records in the database.
+        """
+        if not entities:
+            return None
+
+        tasks = []
+
+        for entity in entities:
+            if hasattr(entity, "before_insert_async"):
+                tasks.append(entity.before_insert_async())
+
+        if tasks:
+            await asyncio.gather(*tasks)
+
+        sql, params = cls._build_create_many(list(entities), placeholder="index")
+        async with Postgres() as db:
+            result = await db.fetch(sql, *params)
+
+        if result:
+            return [
+                int(row['id'])
+                if isinstance(row['id'], str) and str(row["id"]).isnumeric()
+                else row['id']
+                for row in result
+            ]
+        return None
 
     @classmethod
     async def create_async(cls, entity: EntityType) -> Optional[Self]:
@@ -68,7 +122,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         sql, params = cls._build_create(entity, placeholder="index")
         result = await cls._execute_async_query(sql, params)
 
-        return cls._parse_schema(result) if result else None # type: ignore
+        return cls._parse_schema(result) if result else None  # type: ignore
 
     @classmethod
     def update(cls, pk: Union[int, str], entity: EntityType) -> Optional[Self]:
@@ -142,10 +196,52 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
             ]
         )
         values_names = ", ".join(columns)
-        sql = f"INSERT INTO {entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING *" # noqa
+        sql = f"INSERT INTO {entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING *"  # noqa
         return sql, [
             params.get(col) for col in columns
         ] if placeholder == "index" else params
+
+    @classmethod
+    def _build_create_many(
+            cls,
+            entities: list[EntityType],
+            placeholder: Optional[Literal["index", "string"]] = None,
+    ) -> tuple[str, Any]:
+        """
+        Build the SQL query for creating multiple new records.
+        """
+
+        if not entities:
+            raise ValueError("Entities list cannot be empty.")
+
+        first_entity = entities[0]
+        if hasattr(first_entity, "get_columns"):
+            columns = first_entity.get_columns()
+        else:
+            columns = set(vars(first_entity).keys())
+
+        values_list = []
+        params = []
+        for entity in entities:
+            entity_params = parse_values(
+                **entity.model_dump(include=columns), cast_json=placeholder != "index"
+            )
+            values = ", ".join(
+                [
+                    f"${len(params) + idx + 1}" if placeholder == "index" else f"%({col}_{len(params)})s"  # noqa
+                    for idx, col in enumerate(columns)
+                ]
+            )
+            values_list.append(f"({values})")
+            if placeholder == "index":
+                params.extend([entity_params.get(col) for col in columns])
+            else:
+                params.extend({f"{col}_{len(params)}": entity_params.get(col) for col in columns}.items())
+        values_str = ", ".join(values_list)
+        values_names = ", ".join(columns)
+
+        sql = f"INSERT INTO {first_entity.get_table_name()} ({values_names}) VALUES {values_str} RETURNING id"  # noqa
+        return sql, params
 
     @classmethod
     def _build_update(
@@ -180,7 +276,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         )
 
         pk_value = pk if isinstance(pk, int) else f"'{pk}'"
-        sql = f"UPDATE {cls.get_table_name()} SET {values} WHERE id = {pk_value} RETURNING *" # noqa
+        sql = f"UPDATE {cls.get_table_name()} SET {values} WHERE id = {pk_value} RETURNING *"  # noqa
         return sql, [
             params.get(col) for col in columns
         ] if placeholder == "index" else params
@@ -191,7 +287,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         Build the SQL query for deleting a record by primary key.
         """
         pk = cls._validate_pk(pk)
-        return f"DELETE FROM {cls.get_table_name()} WHERE id = {pk}" # noqa
+        return f"DELETE FROM {cls.get_table_name()} WHERE id = {pk}"  # noqa
 
     @classmethod
     def _validate_pk(cls, pk: Union[int, str]) -> Union[int, str]:
@@ -218,7 +314,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         Execute a synchronous SQL query.
         """
         with Postgres() as db:
-            return db.execute(query=sql, params=params).fetchone() # type: ignore
+            return db.execute(query=sql, params=params).fetchone()  # type: ignore
 
     @classmethod
     async def _execute_async_query(cls, sql: str, params: Any = None) -> Any:
