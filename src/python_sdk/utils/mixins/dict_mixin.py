@@ -1,8 +1,10 @@
-import json
 from collections import UserDict
 from collections.abc import ItemsView, KeysView, ValuesView
 from inspect import ismethod
 from typing import Any, Iterator, Self
+
+from glom import glom
+from pydantic import BaseModel, create_model
 
 
 class DictMixin(UserDict):
@@ -17,7 +19,7 @@ class DictMixin(UserDict):
         Returns:
             Any: item from dict
         """
-        return getattr(self, item)
+        return glom(vars(self), item)
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set item in dict.
@@ -74,7 +76,7 @@ class DictMixin(UserDict):
         Returns:
             bool: True if dict is equal to other dict, False otherwise
         """
-        return True if vars(self) == vars(other) else False
+        return vars(self) == vars(other)
 
     def __dir__(self) -> dict[str, Any]:
         """Get list of keys in dict.
@@ -98,7 +100,10 @@ class DictMixin(UserDict):
         Returns:
             Any: value from dict or default value
         """
-        return self[key] if key in self else default
+        try:
+            return glom(vars(self), key)
+        except KeyError:
+            return default
 
     def set(self, key: str, value: Any) -> None:
         """Set value in dict.
@@ -179,12 +184,5 @@ class DictMixin(UserDict):
     def __repr__(self) -> str:
         """Get string representation"""
 
-        return json.dumps(
-            {
-                key: value.model_dump() if hasattr(value, "model_dump") else value
-                for key, value in vars(self).items()
-                if key != "data"
-            },
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
+        schema = self if isinstance(self, BaseModel) else create_model("Entity", vars(self))
+        return repr(schema)
