@@ -65,14 +65,11 @@ class BaseEntity(BaseModel):
     class Meta:
         table_name: str = ""
         indexes: Collection[EntityIndex] = list()
+        exclude: Collection[str] = list()
 
     id: EntityIDField = Field(
         default=None, title="Id", description="The primary key of the table."
     )
-
-    @classmethod
-    def get_columns(cls) -> set[str]:
-        return set(sorted((cast(dict, cls.model_fields)).keys()))
 
     @classmethod
     def get_table_name(cls) -> str:
@@ -81,6 +78,22 @@ class BaseEntity(BaseModel):
             "table_name",
             Strings.to_snake_case(Strings.to_plural(cls.__name__)),
         )
+
+    @classmethod
+    def get_exclude_fields(cls) -> set[str]:
+
+        val = getattr(cls.Meta, "exclude", [])
+        if not isinstance(val, (list, set, tuple)):
+            raise ValueError("Meta.exclude must be a list, set, or tuple")
+        return set(val)
+
+    @classmethod
+    def get_columns(cls) -> set[str]:
+        all_columns = list(sorted((cast(dict, cls.model_fields)).keys()))
+        exclude_columns = cls.get_exclude_fields()
+        return set([col for col in all_columns if col not in exclude_columns])
+
+
 
 
 class SQLModel(BaseEntity, SQLQueriesMixin, SQLCommandsMixin):

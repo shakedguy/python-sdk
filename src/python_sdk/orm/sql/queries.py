@@ -12,14 +12,13 @@ from typing import (
     Union,
 )
 
-from psycopg.types.json import Jsonb
 from pydantic import BaseModel, create_model
 from typing_extensions import Generic
 
-from ...conf import constants
 from ...infrastructure.db import Postgres
 from ...utils import Strings
 from ..base import FindAsyncResult, FindResult
+from .parsers import parse_filter
 
 EntityType = TypeVar("EntityType", bound=BaseModel)
 
@@ -32,7 +31,7 @@ class SQLQueriesMixin(Generic[EntityType]):
     __selected_columns__: set = set()
 
     @classmethod
-    def _parse_schema(cls, data: Any) -> Self:
+    def _parse_schema(cls, data: Any) -> Optional[EntityType]:
         """
         Parse the database record into the entity schema.
         """
@@ -41,7 +40,7 @@ class SQLQueriesMixin(Generic[EntityType]):
             return None
         data = dict(data)
 
-        if not len(cls.__selected_columns__):
+        if not len(cls.__selected_columns__) and hasattr(cls, "model_validate"):
             return cls.model_validate(data)
         data = base_validate_before(data)
         fields: dict[str, tuple[Type, Any]] = {}
@@ -57,10 +56,16 @@ class SQLQueriesMixin(Generic[EntityType]):
         """
         Select specific columns for the query.
         """
+
+        if not args:
+            cls.__selected_columns__.add("*")
+            return cls
+        columns = cls.get_columns() if hasattr(cls, "get_columns") else set(vars(cls).keys())
+
         for arg in args:
             column = Strings.to_str(text=arg)
-            if column not in cls.get_columns():
-                raise ValueError(f"table {cls.get_table_name()} has no column {column}")
+            if column not in columns:
+                raise ValueError(f"table {cls.get_table_name()} has no column {column}") # noqa
             cls.__selected_columns__.add(column)
 
         return cls
@@ -223,7 +228,7 @@ class SQLQueriesMixin(Generic[EntityType]):
         """
         Build the SQL query for checking record existence.
         """
-        sql: Any = f"SELECT EXISTS(SELECT 1 FROM {cls.get_table_name()}"
+        sql: Any = f"SELECT EXISTS(SELECT 1 FROM {cls.get_table_name()}" # type: ignore
         cls.__selected_columns__.clear()
         params = []
         if kwargs:
@@ -231,7 +236,7 @@ class SQLQueriesMixin(Generic[EntityType]):
             counter = 1
             for key, value in kwargs.items():
                 param = f"${counter}" if params_placeholder == "index" else "%s"
-                field, operator = cls._parse_filter(key)
+                field, operator = parse_filter(key)
                 sql += f" {field} {operator} {param}"
                 counter += 1
                 params.append(value)
@@ -262,7 +267,7 @@ class SQLQueriesMixin(Generic[EntityType]):
             counter = 1
             for key, value in kwargs.items():
                 param = f"${counter}" if params_placeholder == "index" else "%s"
-                field, operator = cls._parse_filter(key)
+                field, operator = parse_filter(key)
                 prefix = " AND" if counter > 1 else ""
                 sql += f"{prefix} {field} {operator} {param}"
                 counter += 1
@@ -270,31 +275,4 @@ class SQLQueriesMixin(Generic[EntityType]):
 
         return sql, params
 
-    @classmethod
-    def _parse_values(cls, cast_json: bool = True, **kwargs) -> dict[str, Any]:
-        """
-        Parse values for SQL queries, casting JSON fields if necessary.
-        """
-        return {
-            key: Jsonb(value)
-            if isinstance(value, (list, dict)) and cast_json
-            else value
-            for key, value in kwargs.items()
-        }
 
-    @classmethod
-    def _parse_filter(cls, key: str) -> tuple[str, str]:
-        """
-        Parse filter keys into SQL field and operator.
-        """
-        parts = key.split("__")
-        field = parts[0]
-        lookup = parts[1] if len(parts) > 1 else "eq"
-        field = "id" if field == "pk" else field
-        operator = (
-            constants.SQL_OPERATORS[lookup]
-            if lookup in constants.SQL_OPERATORS
-            else "="
-        )
-
-        return field, operator
