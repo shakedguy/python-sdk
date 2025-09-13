@@ -220,6 +220,8 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         else:
             columns = set(vars(first_entity).keys())
 
+        columns.remove("id")
+        columns = set(sorted(columns))
         values_list = []
         params = []
         for entity in entities:
