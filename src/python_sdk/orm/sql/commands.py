@@ -67,16 +67,13 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         sql, params = cls._build_create_many(list(entities))
         with Postgres() as db:
             db.executemany(query=sql, params_seq=params, returning=True)
-            result = db.fetchall()
 
-        if result:
             return [
                 int(row['id'])
                 if isinstance(row['id'], str) and str(row["id"]).isnumeric()
                 else row['id']
-                for row in result
+                for row in db
             ]
-        return None
 
     @classmethod
     async def create_many_async(cls, entities: Collection[EntityType]) -> Optional[Union[list[str], list[int]]]:
