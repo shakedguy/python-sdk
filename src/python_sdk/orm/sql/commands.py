@@ -185,6 +185,8 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         _id = getattr(entity, "id", None)
         if isinstance(_id, str) and _id is not None and len(_id) > 0:
             columns = set(["id"] + list(columns))
+        elif not _id:
+            columns.remove("id")
 
         params = parse_values(
             **entity.model_dump(include=columns), cast_json=placeholder != "index"
