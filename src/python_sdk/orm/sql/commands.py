@@ -229,7 +229,12 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
 
             values = ", ".join([f"%s" for _ in columns])
             sql = f"INSERT INTO {entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING id"  # noqa
-            params = [tuple(entity[col] for col in columns) for entity in entities]
+            params = []
+            for entity in entities:
+                entity_params = parse_values(
+                    **entity.model_dump(include=columns), cast_json=True
+                )
+                params.append(tuple(entity_params.get(col) for col in columns))
             return sql, params
 
         for entity in entities:
