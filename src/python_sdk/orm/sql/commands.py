@@ -66,7 +66,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
                 entity.before_insert()
         sql, params = cls._build_create_many(list(entities))
         with Postgres() as db:
-            result = db.execute(query=sql, params=params).fetchall()  # type: ignore
+            result = db.executemany(query=sql, params=params, returning=True).fetchall()  # type: ignore
 
         if result:
             return [
@@ -224,24 +224,32 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         columns = set(sorted(columns))
         values_list = []
         params = []
+
+        # create array of tuples for executemany
         for entity in entities:
             entity_params = parse_values(
                 **entity.model_dump(include=columns), cast_json=placeholder != "index"
             )
-            values = ", ".join(
-                [
-                    f"${len(params) + idx + 1}" if placeholder == "index" else f"%({col}_{len(params)})s"  # noqa
-                    for idx, col in enumerate(columns)
-                ]
-            )
-            values_list.append(f"({values})")
             if placeholder == "index":
-                params.extend([entity_params.get(col) for col in columns])
+                params.extend(tuple(entity_params.get(col) for col in columns))
+                values = ", ".join(
+                    [
+                        f"${len(params) - len(columns) + idx + 1}"
+                        for idx, col in enumerate(columns)
+                    ]
+                )
             else:
-                params.extend({f"{col}_{len(params)}": entity_params.get(col) for col in columns}.items())
+                param_dict = {f"{col}_{len(params)}": entity_params.get(col) for col in columns}
+                params.append(param_dict)
+                values = ", ".join(
+                    [
+                        f"%({col}_{len(params) - 1})s"
+                        for idx, col in enumerate(columns)
+                    ]
+                )
+            values_list.append(f"({values})")
         values_str = ", ".join(values_list)
         values_names = ", ".join(columns)
-
         sql = f"INSERT INTO {first_entity.get_table_name()} ({values_names}) VALUES {values_str} RETURNING id"  # noqa
         return sql, params
 
