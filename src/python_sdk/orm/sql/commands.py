@@ -1,12 +1,10 @@
 import asyncio
 from typing import Any, Collection, Generic, Literal, Optional, Self, TypeVar, Union
 
-from bson.objectid import ObjectId
 from pydantic import BaseModel
 
 from ...infrastructure.db import Postgres
 from ...utils import DateTime
-from ..mongo.commands import DocumentID
 from .parsers import parse_values
 
 EntityType = TypeVar("EntityType", bound=BaseModel)
@@ -302,15 +300,17 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
             raise ValueError("ID cannot be empty or None.")
         return int(pk) if str(pk).isdigit() else pk
 
-    @classmethod
-    def _update_instance_attributes(cls, created: Any) -> None:
+    def _update_instance_attributes(self, created: Any) -> None:
         """
         Update the instance attributes with the values from the created record.
         """
-        for key, value in vars(created).items():
-            if isinstance(value, ObjectId):
-                value = DocumentID(str(value))
-            setattr(cls, key, value)
+
+        if hasattr(created, "get_columns"):
+            columns = created.get_columns()
+        else:
+            columns = set(vars(created).keys())
+        for column in columns:
+            setattr(self, column, getattr(created, column))
 
     @classmethod
     def _execute_sync_query(cls, sql: str, params: Any = None) -> Any:
