@@ -222,34 +222,30 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
 
         columns.remove("id")
         columns = set(sorted(columns))
-        values_list = []
+        values_names = ", ".join(columns)
         params = []
+        values_list = []
+        if placeholder != "index":
 
-        # create array of tuples for executemany
+            values = ", ".join([f"%s" for _ in columns])
+            sql = f"INSERT INTO {entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING id"  # noqa
+            params = [tuple(entity[col] for col in columns) for entity in entities]
+            return sql, params
+
         for entity in entities:
             entity_params = parse_values(
                 **entity.model_dump(include=columns), cast_json=placeholder != "index"
             )
-            if placeholder == "index":
-                params.extend(tuple(entity_params.get(col) for col in columns))
-                values = ", ".join(
-                    [
-                        f"${len(params) - len(columns) + idx + 1}"
-                        for idx, col in enumerate(columns)
-                    ]
-                )
-            else:
-                param_dict = {f"{col}_{len(params)}": entity_params.get(col) for col in columns}
-                params.append(param_dict)
-                values = ", ".join(
-                    [
-                        f"%({col}_{len(params) - 1})s"
-                        for idx, col in enumerate(columns)
-                    ]
-                )
+            params.extend(tuple(entity_params.get(col) for col in columns))
+            values = ", ".join(
+                [
+                    f"${len(params) - len(columns) + idx + 1}"
+                    for idx, col in enumerate(columns)
+                ]
+            )
             values_list.append(f"({values})")
         values_str = ", ".join(values_list)
-        values_names = ", ".join(columns)
+
         sql = f"INSERT INTO {first_entity.get_table_name()} ({values_names}) VALUES {values_str} RETURNING id"  # noqa
         return sql, params
 
