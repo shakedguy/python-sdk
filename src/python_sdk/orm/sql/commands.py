@@ -66,7 +66,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
                 entity.before_insert()
         sql, params = cls._build_create_many(list(entities))
         with Postgres() as db:
-            result = db.execute(query=sql, params=params, returning=True).fetchall()  # type: ignore
+            result = db.execute(query=sql, params=params).fetchall()  # type: ignore
 
         if result:
             return [
