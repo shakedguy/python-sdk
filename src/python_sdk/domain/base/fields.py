@@ -135,7 +135,7 @@ def _parse_json_field(value: Any) -> Optional[JsonValue]:
         except ValueError:
             pass
 
-    return value if isinstance(value, JsonValue) else None
+    return value if isinstance(value, (dict, list)) else None
 
 
 JsonObjectField = Annotated[
