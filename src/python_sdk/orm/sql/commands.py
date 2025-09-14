@@ -228,7 +228,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if placeholder != "index":
 
             values = ", ".join([f"%s" for _ in columns])
-            sql = f"INSERT INTO {entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING id"  # noqa
+            sql = f"INSERT INTO {first_entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING id"  # noqa
             params = []
             for entity in entities:
                 entity_params = parse_values(
