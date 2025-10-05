@@ -128,3 +128,6 @@ MIMETYPES = {
     "xml": "text/xml",
     "svg": "image/svg+xml",
 }
+
+
+CACHE_PREFIX = "cache:"
