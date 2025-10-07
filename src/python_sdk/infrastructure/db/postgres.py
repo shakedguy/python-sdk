@@ -119,9 +119,10 @@ class Postgres(AbstractContextManager):
     async def __aenter__(self) -> Connection:
         if not PostgresConnectionPool.async_pool:
             await PostgresConnectionPool.init_pools_async()
-        self.async_connection = await PostgresConnectionPool.async_pool.acquire(
+        self.async_connection:Connection = await PostgresConnectionPool.async_pool.acquire(
             timeout=settings.postgres.timeout
         )
+        
         await self.async_connection.set_type_codec(
             "json",
             encoder=lambda x: to_json(x).decode(),

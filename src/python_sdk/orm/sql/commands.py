@@ -50,7 +50,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if hasattr(entity, "before_insert"):
             entity.before_insert()
         sql, params = cls._build_create(entity)
-        result = cls._execute_sync_query(sql, params)
+        result = cls.execute_sync_query(sql, params)
 
         return cls._parse_schema(result) if result else None  # type: ignore
 
@@ -65,16 +65,12 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
             if hasattr(entity, "before_insert"):
                 entity.before_insert()
         sql, params = cls._build_create_many(list(entities))
-        with Postgres() as db:
-            db.executemany(query=sql, params_seq=params, returning=True)
-            result = db.fetchmany(len(entities))
+        rows = cls.execute_many_sync(sql, *params)
 
-        if result:
+        if rows:
             return [
-                int(row['id'])
-                if isinstance(row['id'], str) and str(row["id"]).isnumeric()
-                else row['id']
-                for row in result
+                cls._parse_schema(row)
+                for row in rows
             ]
         return None
 
@@ -86,25 +82,21 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if not entities:
             return None
 
-        tasks = []
-
-        for entity in entities:
-            if hasattr(entity, "before_insert_async"):
-                tasks.append(entity.before_insert_async())
-
-        if tasks:
-            await asyncio.gather(*tasks)
+        await asyncio.gather(
+            *[
+                entity.before_insert_async()
+                for entity in entities
+                if hasattr(entity, "before_insert_async")
+            ]
+        )
 
         sql, params = cls._build_create_many(list(entities), placeholder="index")
-        async with Postgres() as db:
-            result = await db.fetch(sql, *params)
+        rows = await cls.execute_many_async(sql, *params)
 
-        if result:
+        if rows:
             return [
-                int(row['id'])
-                if isinstance(row['id'], str) and str(row["id"]).isnumeric()
-                else row['id']
-                for row in result
+                cls._parse_schema(row)
+                for row in rows
             ]
         return None
 
@@ -119,7 +111,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if hasattr(entity, "before_insert_async"):
             await entity.before_insert_async()
         sql, params = cls._build_create(entity, placeholder="index")
-        result = await cls._execute_async_query(sql, params)
+        result = await cls.execute_async_query(sql, params)
 
         return cls._parse_schema(result) if result else None  # type: ignore
 
@@ -133,7 +125,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if hasattr(entity, "before_update"):
             entity.before_update()
         sql, params = cls._build_update(pk, entity)
-        return cls._execute_sync_query(sql, params)
+        return cls.execute_sync_query(sql, params)
 
     @classmethod
     async def update_async(
@@ -147,7 +139,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         if hasattr(entity, "before_update_async"):
             await entity.before_update_async()
         sql, params = cls._build_update(pk, entity, placeholder="index")
-        return await cls._execute_async_query(sql, params)
+        return await cls.execute_async_query(sql, params)
 
     @classmethod
     def delete(cls, pk: Union[str, int]) -> int:
@@ -155,7 +147,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         Delete a record from the database by primary key.
         """
         sql = cls._build_delete(pk)
-        return cls._execute_sync_query(sql).rowcount
+        return cls.execute_sync_query(sql).rowcount
 
     @classmethod
     async def delete_async(cls, pk: Union[str, int]) -> int:
@@ -163,7 +155,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         Asynchronously delete a record from the database by primary key.
         """
         sql = cls._build_delete(pk)
-        result = await cls._execute_async_query(sql)
+        result = await cls.execute_async_query(sql)
         return int(result.rowcount)
 
     @classmethod
@@ -228,15 +220,15 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
         values_list = []
         if placeholder != "index":
 
-            values = ", ".join([f"%s" for _ in columns])
-            sql = f"INSERT INTO {first_entity.get_table_name()} ({values_names}) VALUES ({values}) RETURNING id"  # noqa
+            values = ",".join(f"({", ".join([f"%s" for _ in columns])})" for _ in range(len(entities)))
+            sql = f"INSERT INTO {first_entity.get_table_name()} ({values_names}) VALUES {values} RETURNING *"  # noqa
             params = []
             for entity in entities:
                 entity_params = parse_values(
                     **entity.model_dump(include=columns), cast_json=True
                 )
                 params.append(tuple(entity_params.get(col) for col in columns))
-            return sql, params
+            return sql, [v for r in params for v in r]
 
         for entity in entities:
             entity_params = parse_values(
@@ -252,7 +244,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
             values_list.append(f"({values})")
         values_str = ", ".join(values_list)
 
-        sql = f"INSERT INTO {first_entity.get_table_name()} ({values_names}) VALUES {values_str} RETURNING id"  # noqa
+        sql = f"INSERT INTO {first_entity.get_table_name()} ({values_names}) VALUES {values_str} RETURNING *"  # noqa
         return sql, params
 
     @classmethod
@@ -323,7 +315,7 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
             setattr(self, column, getattr(created, column))
 
     @classmethod
-    def _execute_sync_query(cls, sql: str, params: Any = None) -> Any:
+    def execute_sync_query(cls, sql: str, params: Any = None) -> Any:
         """
         Execute a synchronous SQL query.
         """
@@ -331,9 +323,32 @@ class SQLCommandsMixin(Generic[EntityType]):  # noqa
             return db.execute(query=sql, params=params).fetchone()  # type: ignore
 
     @classmethod
-    async def _execute_async_query(cls, sql: str, params: Any = None) -> Any:
+    async def execute_async_query(cls, sql: str, params: Any = None) -> Any:
         """
         Execute an asynchronous SQL query.
         """
         async with Postgres() as db:
             return await db.fetchrow(sql, *params)
+
+    @classmethod
+    def execute_many_sync(cls, sql: str, *args: Any, **kwargs: Any) -> Any:
+        """
+        Execute a synchronous SQL query.
+        """
+
+        params: Optional[Union[Sequence[Any], Mapping[str, Any]]] = list(args) if args else kwargs if kwargs else None
+
+        with Postgres() as db:
+            return db.execute(sql, params).fetchall()
+
+    @classmethod
+    async def execute_many_async(cls, sql: str, *args: Any, **kwargs: Any) -> Any:
+        """
+        Execute an asynchronous SQL query.
+        """
+        params: tuple[Any] = args if args else ()
+        if kwargs:
+            params = (kwargs,)
+
+        async with Postgres() as db:
+            return await db.fetch(sql, *params)
