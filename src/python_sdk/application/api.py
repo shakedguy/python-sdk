@@ -77,39 +77,60 @@ class API(FastAPI):
         self.docs_url = docs_url
 
 
-    @asynccontextmanager
-    async def run_lifespan(self):
-        try:
-            await init_async(
-                init_postgres=self._init_postgres,
-                init_cache=self._init_cache,
-                init_mongo=self._init_mongo,
-                init_messaging=self._init_messaging,
-                init_qdrant=self._init_qdrant,
-            )
-            if self._before_start:
-                self._before_start = (
-                    [to_async(f)(self) for f in self._before_start]
-                    if isinstance(self._before_start, list)
-                    else [to_async(self._before_start)(self)]
+        @asynccontextmanager
+        async def _lifespan(_app: FastAPI):
+            nonlocal before_start, before_finish
+            try:
+                await init_async(
+                    init_postgres=init_postgres,
+                    init_cache=init_cache,
+                    init_mongo=init_mongo,
+                    init_messaging=init_messaging,
                 )
-                await asyncio.gather(*self._before_start)
+                if before_start:
+                    before_start = (
+                        [to_async(f) for f in before_start]
+                        if isinstance(before_start, list)
+                        else [to_async(before_start)]
+                    )
+                    await asyncio.gather(*before_start)
 
-            yield {"ws": self.websocket_manager, "sio": self.sio_app}
-        finally:
-            logger.info("Application shutdown")
-            if self.websocket_manager is not None:
-                await self.websocket_manager.close()
-            if self.sio is not None:
-                await self.sio.shutdown()
-            await cleanup_async()
-            if self._before_finish:
-                self._before_finish = (
-                    [to_async(f)(self) for f in self._before_finish]
-                    if isinstance(self._before_finish, list)
-                    else [to_async(self._before_finish)(self)]
-                )
-                await asyncio.gather(*self._before_finish)
+                yield {"ws": self.websocket_manager, "sio": self.sio_app}
+            finally:
+                logger.info("Application shutdown")
+                if self.websocket_manager is not None:
+                    await self.websocket_manager.close()
+                if self.sio is not None:
+                    await self.sio.shutdown()
+                await cleanup_async()
+                if before_finish:
+                    before_finish = (
+                        [to_async(f) for f in before_finish]
+                        if isinstance(before_finish, list)
+                        else [to_async(before_finish)]
+                    )
+                    await asyncio.gather(*before_finish)
+
+        super().__init__(
+            title=name,
+            description=description,
+            version=version,
+            debug=debug,
+            openapi_url=openapi_url,
+            docs_url=docs_url,
+            lifespan=_lifespan,
+        )
+        self.add_exception_handler(HTTPException, http_exception_handler)
+        self.add_middleware(
+            CORSMiddleware,  # type: ignore
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        if self._broker_router is not None:
+            self.include_router(self._broker_router)
 
         super().__init__(
             title=self.name,
@@ -118,7 +139,7 @@ class API(FastAPI):
             debug=self.debug,
             openapi_url=self.openapi_url,
             docs_url=self.docs_url,
-            lifespan=self._lifespan or self.run_lifespan,
+            lifespan=self._lifespan or _lifespan,
         )
         self.add_exception_handler(HTTPException, http_exception_handler)
         self.add_middleware(
