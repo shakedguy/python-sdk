@@ -69,11 +69,16 @@ class API(FastAPI):
         self._lifespan = lifespan
         self._before_start = before_start
         self._before_finish = before_finish
+        self.name = name
+        self.description = description
+        self.version = version
+        self.debug = debug
+        self.openapi_url = openapi_url
+        self.docs_url = docs_url
 
 
     @asynccontextmanager
     async def lifespan(self):
-        nonlocal before_start, before_finish
         try:
             await init_async(
                 init_postgres=self._init_postgres,
@@ -88,7 +93,7 @@ class API(FastAPI):
                     if isinstance(self._before_start, list)
                     else [to_async(self._before_start)(self)]
                 )
-                await asyncio.gather(*before_start)
+                await asyncio.gather(*self._before_start)
 
             yield {"ws": self.websocket_manager, "sio": self.sio_app}
         finally:
@@ -107,13 +112,13 @@ class API(FastAPI):
                 await asyncio.gather(*self._before_finish)
 
         super().__init__(
-            title=name,
-            description=description,
-            version=version,
-            debug=debug,
-            openapi_url=openapi_url,
-            docs_url=docs_url,
-            lifespan=lifespan or self.lifespan,
+            title=self.name,
+            description=self.description,
+            version=self.version,
+            debug=self.debug,
+            openapi_url=self.openapi_url,
+            docs_url=self.docs_url,
+            lifespan=self._lifespan or self.lifespan,
         )
         self.add_exception_handler(HTTPException, http_exception_handler)
         self.add_middleware(
