@@ -56,46 +56,55 @@ class API(FastAPI):
         )
         self._broker_router: Optional[StreamRouter] = None
         self.broker: Optional[Broker] = None
+        self._init_postgres = init_postgres
+        self._init_cache = init_cache
+        self._init_mongo = init_mongo
+        self._init_messaging = init_messaging
+        self._init_qdrant = init_qdrant
         if init_messaging:
             self._broker_router = Broker.create_router(
                 settings.broker.url, tls=settings.broker.use_ssl
             )
             self.broker = Broker(settings.broker.url, tls=settings.broker.use_ssl)
+        self._lifespan = lifespan
+        self._before_start = before_start
+        self._before_finish = before_finish
 
-        @asynccontextmanager
-        async def _lifespan(_app: FastAPI):
-            nonlocal before_start, before_finish
-            try:
-                await init_async(
-                    init_postgres=init_postgres,
-                    init_cache=init_cache,
-                    init_mongo=init_mongo,
-                    init_messaging=init_messaging,
-                    init_qdrant=init_qdrant,
+
+    @asynccontextmanager
+    async def lifespan(self):
+        nonlocal before_start, before_finish
+        try:
+            await init_async(
+                init_postgres=self._init_postgres,
+                init_cache=self._init_cache,
+                init_mongo=self._init_mongo,
+                init_messaging=self._init_messaging,
+                init_qdrant=self._init_qdrant,
+            )
+            if self._before_start:
+                self._before_start = (
+                    [to_async(f)(self) for f in self._before_start]
+                    if isinstance(self._before_start, list)
+                    else [to_async(self._before_start)(self)]
                 )
-                if before_start:
-                    before_start = (
-                        [to_async(f)(_app) for f in before_start]
-                        if isinstance(before_start, list)
-                        else [to_async(before_start)(_app)]
-                    )
-                    await asyncio.gather(*before_start)
+                await asyncio.gather(*before_start)
 
-                yield {"ws": self.websocket_manager, "sio": self.sio_app}
-            finally:
-                logger.info("Application shutdown")
-                if self.websocket_manager is not None:
-                    await self.websocket_manager.close()
-                if self.sio is not None:
-                    await self.sio.shutdown()
-                await cleanup_async()
-                if before_finish:
-                    before_finish = (
-                        [to_async(f)(_app) for f in before_finish]
-                        if isinstance(before_finish, list)
-                        else [to_async(before_finish)(_app)]
-                    )
-                    await asyncio.gather(*before_finish)
+            yield {"ws": self.websocket_manager, "sio": self.sio_app}
+        finally:
+            logger.info("Application shutdown")
+            if self.websocket_manager is not None:
+                await self.websocket_manager.close()
+            if self.sio is not None:
+                await self.sio.shutdown()
+            await cleanup_async()
+            if self._before_finish:
+                self._before_finish = (
+                    [to_async(f)(self) for f in self._before_finish]
+                    if isinstance(self._before_finish, list)
+                    else [to_async(self._before_finish)(self)]
+                )
+                await asyncio.gather(*self._before_finish)
 
         super().__init__(
             title=name,
@@ -104,7 +113,7 @@ class API(FastAPI):
             debug=debug,
             openapi_url=openapi_url,
             docs_url=docs_url,
-            lifespan=lifespan or _lifespan,
+            lifespan=lifespan or self.lifespan,
         )
         self.add_exception_handler(HTTPException, http_exception_handler)
         self.add_middleware(
