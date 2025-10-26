@@ -78,7 +78,7 @@ class API(FastAPI):
 
 
     @asynccontextmanager
-    async def lifespan(self):
+    async def run_lifespan(self):
         try:
             await init_async(
                 init_postgres=self._init_postgres,
@@ -118,7 +118,7 @@ class API(FastAPI):
             debug=self.debug,
             openapi_url=self.openapi_url,
             docs_url=self.docs_url,
-            lifespan=self._lifespan or self.lifespan,
+            lifespan=self._lifespan or self.run_lifespan,
         )
         self.add_exception_handler(HTTPException, http_exception_handler)
         self.add_middleware(
