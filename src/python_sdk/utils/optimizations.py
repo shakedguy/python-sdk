@@ -1,3 +1,6 @@
+import logging
+import multiprocessing
+import multiprocessing.util
 from typing import Optional
 
 
@@ -16,6 +19,7 @@ def optimize_gc(
     """
     import gc
 
+
     gc.collect(2)
     gc.freeze()
     _, g1, g2 = gc.get_threshold()
@@ -23,3 +27,5 @@ def optimize_gc(
     threshold1 = threshold1 or g1 * 5
     threshold2 = threshold2 or g2 * 10
     gc.set_threshold(threshold0, threshold1, threshold2)
+    multiprocessing.set_start_method("spawn", force=True)
+    multiprocessing.util.log_to_stderr(logging.DEBUG)
