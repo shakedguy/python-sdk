@@ -46,8 +46,7 @@ def format_log(record: Any) -> str:
     }
     for key in ("module", "function", "name"):
         val = data.get(key, "")
-        # data[key] = escape_color_tags(str(val))
-        data[key] = str(val)
+        data[key] = escape_color_tags(str(val))
 
     return LOG_FORMAT.format(**data)
 
