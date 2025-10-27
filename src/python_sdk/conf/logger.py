@@ -2,6 +2,7 @@ import enum
 import re
 import sys
 from datetime import datetime
+from logging import _nameToLevel
 from typing import Any
 
 from loguru import logger
