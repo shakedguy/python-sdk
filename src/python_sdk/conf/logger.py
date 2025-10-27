@@ -39,21 +39,27 @@ def format_log(record: Any) -> str:
     return LOG_FORMAT.format(**data)
 
 
-logger.remove()
-logger.add(
-    sys.stderr, level=settings.log_level, colorize=True, enqueue=True, format=format_log
-)
-
-
 def configure_logger() -> None:
     """
     Configure the logger settings.
     """
     logger.remove()
+
     logger.add(
         sys.stderr,
         level=settings.log_level,
         colorize=True,
         enqueue=True,
         format=format_log,
+        backtrace=True,
+        diagnose=True,
+
     )
+
+
+async def complete_and_stop_logger() -> None:
+    await logger.complete()
+    logger.stop()
+
+
+configure_logger()
