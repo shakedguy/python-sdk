@@ -1,3 +1,4 @@
+import enum
 import re
 import sys
 from datetime import datetime
@@ -9,6 +10,17 @@ from .app_settings import settings
 
 LOG_FORMAT = "<green>[{local_time}]</green> | <level>{level.name}</level> | <cyan>{pod_name}:{name}</cyan> | <blue>{module}.{function}</blue>:<yellow>{line}</yellow> | <level>{message}</level>\n"
 
+class LogLevel(enum.StrEnum):
+    TRACE = "TRACE"
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    SUCCESS = "SUCCESS"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+    def to_value(self) -> int:
+        return _nameToLevel[self.name]
 
 def remove_unwanted_tags(text: str) -> str:
     allowed = {"<green>", "<level>", "<cyan>", "<blue>", "<yellow>"}
