@@ -72,7 +72,7 @@ def configure_logger() -> None:
 
 async def complete_and_stop_logger() -> None:
     await logger.complete()
-    logger.stop()
+    logger.remove()
 
 
 configure_logger()
