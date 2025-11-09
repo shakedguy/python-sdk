@@ -29,8 +29,9 @@ from pydantic_core import CoreSchema, core_schema
 from pydantic_core.core_schema import (
     ValidationInfo,
 )
-from pymongo import ReplaceOne, ReturnDocument, UpdateOne
+from pymongo.operations import ReplaceOne, UpdateOne
 from pymongo.results import BulkWriteResult
+from pymongo.synchronous.collection import ReturnDocument
 
 from ...errors import ConcurrencyError, NotExistsError
 from ...infrastructure.db import Mongo, MongoCollection

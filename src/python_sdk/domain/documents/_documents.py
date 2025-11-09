@@ -6,10 +6,16 @@ from typing import Any, Mapping, Optional, Union, cast
 from pydantic import (
     Field,
 )
-from pymongo import ASCENDING, DESCENDING, GEO2D, GEOSPHERE, HASHED, TEXT
 
 from ...domain.base.base_model import BaseModel
 from ...utils import Strings, enums
+
+ASCENDING = 1
+DESCENDING = -1
+GEO2D = "2d"
+GEOSPHERE = "2dsphere"
+HASHED = "hashed"
+TEXT = "text"
 
 
 class DocumentIndexType(enums.StrEnum):
@@ -21,7 +27,7 @@ class DocumentIndexType(enums.StrEnum):
     GEO2D = "2d"
 
     @property
-    def pymongo_value(self) -> Union[int, str]:
+    def pymongo_value(self) -> Union[int, Union[int, str]]:
         mapping = {
             DocumentIndexType.ASCENDING: ASCENDING,
             DocumentIndexType.DESCENDING: DESCENDING,
@@ -43,10 +49,10 @@ class DocumentIndex(BaseModel):
         title="Background",
         description="Index is created in the background.",
     )
-    fields: Optional[dict[str, DocumentIndexType]]  = Field(
+    fields: Optional[dict[str, DocumentIndexType]] = Field(
         default=None, title="Keys", description="The index keys."
     )
-    field:Optional[str] = Field(
+    field: Optional[str] = Field(
         default=None,
         title="Field",
         description="The field to index. Use this if the index is on a single field.",
@@ -86,5 +92,3 @@ VERSION_INDEX = DocumentIndex(
     unique=True,
     fields={"_id": DocumentIndexType.ASCENDING, "version": DocumentIndexType.ASCENDING},
 )
-
-

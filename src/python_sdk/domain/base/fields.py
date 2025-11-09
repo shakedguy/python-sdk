@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Annotated, Any, Optional, TypeVar, Union
 from uuid import UUID
 
-from bson import ObjectId
 from bson.errors import InvalidId
+from bson.objectid import ObjectId
 from pydantic import (
     BeforeValidator,
     GetCoreSchemaHandler,

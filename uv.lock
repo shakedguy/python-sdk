@@ -1805,7 +1805,7 @@ requires-dist = [
     { name = "pydantic", extras = ["email"], specifier = ">=2.11.7" },
     { name = "pydantic-settings", specifier = ">=2.10.1" },
     { name = "pydash", specifier = ">=8.0.5" },
-    { name = "pymongo", specifier = ">=4.14.0" },
+    { name = "pymongo", specifier = ">=4.15.3" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "python-levenshtein", specifier = ">=0.27.1" },
     { name = "python-socketio", specifier = ">=5.13.0" },
