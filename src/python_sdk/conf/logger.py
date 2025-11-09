@@ -11,6 +11,7 @@ from .app_settings import settings
 
 LOG_FORMAT = "<green>[{local_time}]</green> | <level>{level.name}</level> | <cyan>{pod_name}:{name}</cyan> | <blue>{module}.{function}</blue>:<yellow>{line}</yellow> | <level>{message}</level>\n"
 
+
 class LogLevel(enum.StrEnum):
     TRACE = "TRACE"
     DEBUG = "DEBUG"
@@ -22,6 +23,7 @@ class LogLevel(enum.StrEnum):
 
     def to_value(self) -> int:
         return _nameToLevel[self.name]
+
 
 def remove_unwanted_tags(text: str) -> str:
     allowed = {"<green>", "<level>", "<cyan>", "<blue>", "<yellow>"}
@@ -35,7 +37,6 @@ def escape_color_tags(value: str) -> str:
 
 
 def format_log(record: Any) -> str:
-    from ..utils.strings import Strings
 
     data = {
         **dict(record),
@@ -43,7 +44,7 @@ def format_log(record: Any) -> str:
             "%Y-%m-%d %H:%M:%S (UTC%z)"
         ),
         "pod_name": settings.kube.pod_name,
-        "message": remove_unwanted_tags(Strings.normalize(record.pop("message", ""))),
+        "message": escape_color_tags(remove_unwanted_tags(record.pop("message", ""))),
     }
     for key in ("module", "function", "name"):
         val = data.get(key, "")
