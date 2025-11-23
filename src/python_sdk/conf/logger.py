@@ -53,7 +53,7 @@ def format_log(record: Any) -> str:
     return LOG_FORMAT.format(**data)
 
 
-def configure_logger() -> None:
+def configure_logger(enqueue: bool = False, colorize: bool = True) -> None:
     """
     Configure the logger settings.
     """
@@ -62,8 +62,8 @@ def configure_logger() -> None:
     logger.add(
         sys.stderr,
         level=settings.log_level,
-        colorize=True,
-        enqueue=True,
+        colorize=colorize,
+        enqueue=enqueue,
         format=format_log,
         backtrace=True,
         diagnose=True,
@@ -74,6 +74,3 @@ def configure_logger() -> None:
 async def complete_and_stop_logger() -> None:
     await logger.complete()
     logger.remove()
-
-
-configure_logger()
