@@ -15,6 +15,7 @@ dependencies = [
     "cachier>=4.1.0",
     "dnspython>=2.7.0",
     "fastapi>=0.120.0",
+    "faststream>=0.6.4",
     "funcy>=2.0",
     "glom>=24.11.0",
     "httpx>=0.28.1",
