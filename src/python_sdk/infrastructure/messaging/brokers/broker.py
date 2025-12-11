@@ -8,15 +8,17 @@ from functools import cache
 from ssl import SSLContext
 from typing import Any, AnyStr, Literal, Optional, Sequence, Union, cast, overload
 
-from faststream.broker.fastapi import StreamRouter
+from faststream._internal.fastapi.router import StreamRouter  # noqa
 from faststream.confluent import KafkaBroker, KafkaMessage, TopicPartition
-from faststream.confluent.subscriber.asyncapi import (
-    AsyncAPISubscriber as KafkaSubscriber,
-)
+from faststream.confluent.subscriber.usecase import DefaultSubscriber as KafkaSubscriber
 from faststream.rabbit import RabbitBroker, RabbitExchange, RabbitMessage, RabbitQueue
-from faststream.rabbit.subscriber.asyncapi import AsyncAPISubscriber as RabbitSubscriber
+from faststream.rabbit.subscriber.usecase import RabbitSubscriber
 from faststream.redis import ListSub, PubSub, RedisBroker, RedisMessage, StreamSub
-from faststream.redis.subscriber.asyncapi import AsyncAPISubscriber as RedisSubscriber
+from faststream.redis.subscriber.usecases import (
+    ChannelSubscriber,
+    ListSubscriber,
+    StreamSubscriber,
+)
 from faststream.security import BaseSecurity
 from faststream.types import SendableMessage
 from loguru import logger
@@ -31,9 +33,12 @@ from .kafka import KafkaBrokerFactory
 from .rabbitmq import RabbitMQBrokerFactory
 from .redis import RedisBrokerFactory
 
-Subscriber = Union[RedisSubscriber, RabbitSubscriber, KafkaSubscriber]
+RedisSubscriber = Union[ListSubscriber, ChannelSubscriber, StreamSubscriber]
+Subscriber = Union[ListSubscriber, ChannelSubscriber, StreamSubscriber, RabbitSubscriber, KafkaSubscriber]
 BrokerType = Union[RabbitBroker, RedisBroker, KafkaBroker]
 BrokerUrl = Union[str, RedisDsn, AmqpDsn, KafkaDsn]
+
+
 
 
 class Broker(object):
@@ -48,12 +53,12 @@ class Broker(object):
     )
 
     def __init__(
-        self,
-        url: BrokerUrl = settings.broker.url,
-        *,
-        connection_name: Optional[str] = None,
-        max_consumers: int = 5,
-        tls: bool = False,
+            self,
+            url: BrokerUrl = settings.broker.url,
+            *,
+            connection_name: Optional[str] = None,
+            max_consumers: int = 5,
+            tls: bool = False,
     ) -> None:
         url = url.lower() if isinstance(url, str) else url.unicode_string()
         self.broker_type: Literal["rabbitmq", "redis", "kafka"] = (
@@ -121,18 +126,18 @@ class Broker(object):
             logger.error("Error closing broker: {error}", error=e)
 
     async def publish(
-        self,
-        message: SendableMessage,
-        to: Union[str, RabbitQueue, PubSub, ListSub, StreamSub],
-        *,
-        exchange: Union[str, RabbitExchange, None] = None,
-        pub_type: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
-        headers: dict[str, Any] | None = None,
-        maxlen: Optional[int] = None,
-        expiration: Optional[int | datetime | float | timedelta] = None,
-        routing_key: Optional[str] = "",
-        auto_delete: bool = False,
-        **kwargs,
+            self,
+            message: SendableMessage,
+            to: Union[str, RabbitQueue, PubSub, ListSub, StreamSub],
+            *,
+            exchange: Union[str, RabbitExchange, None] = None,
+            pub_type: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
+            headers: dict[str, Any] | None = None,
+            maxlen: Optional[int] = None,
+            expiration: Optional[int | datetime | float | timedelta] = None,
+            routing_key: Optional[str] = "",
+            auto_delete: bool = False,
+            **kwargs,
     ) -> None:
         match self.broker_type:
             case "redis":
@@ -169,19 +174,19 @@ class Broker(object):
                 )
 
     async def request(
-        self,
-        message: SendableMessage,
-        to: Union[str, RabbitQueue, PubSub, ListSub, StreamSub],
-        *,
-        exchange: Union[str, RabbitExchange, None] = None,
-        pub_type: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
-        headers: dict[str, Any] | None = None,
-        maxlen: Optional[int] = None,
-        timeout: Optional[float] = 30.0,
-        expiration: Optional[int | datetime | float | timedelta] = None,
-        routing_key: Optional[str] = "",
-        auto_delete: bool = False,
-        **kwargs,
+            self,
+            message: SendableMessage,
+            to: Union[str, RabbitQueue, PubSub, ListSub, StreamSub],
+            *,
+            exchange: Union[str, RabbitExchange, None] = None,
+            pub_type: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
+            headers: dict[str, Any] | None = None,
+            maxlen: Optional[int] = None,
+            timeout: Optional[float] = 30.0,
+            expiration: Optional[int | datetime | float | timedelta] = None,
+            routing_key: Optional[str] = "",
+            auto_delete: bool = False,
+            **kwargs,
     ) -> Optional[BrokerMessage]:
         if self.broker_type == "kafka":
             response = await self._kafka_worker.request(
@@ -251,52 +256,55 @@ class Broker(object):
 
     @overload
     def subscribe(
-        self,
-        *,
-        to: Union[str, RabbitQueue],
-        exchange: Union[str, RabbitExchange, None] = None,
-        retry: Union[bool, int] = False,
-        no_ack: Optional[bool] = False,
-        no_reply: Optional[bool] = False,
-        expiration: Optional[Union[int, float]] = None,
-        auto_delete: bool = False,
-    ) -> RabbitSubscriber: ...
+            self,
+            *,
+            to: Union[str, RabbitQueue],
+            exchange: Union[str, RabbitExchange, None] = None,
+            retry: Union[bool, int] = False,
+            no_ack: Optional[bool] = False,
+            no_reply: Optional[bool] = False,
+            expiration: Optional[Union[int, float]] = None,
+            auto_delete: bool = False,
+    ) -> RabbitSubscriber:
+        ...
 
     @overload
     def subscribe(
-        self,
-        *,
-        to: str,
-        partitions: Sequence[TopicPartition] = (),
-        retry: Union[bool, int] = False,
-        no_ack: Optional[bool] = False,
-        no_reply: Optional[bool] = False,
-        group_id: Optional[str] = None,
-    ) -> KafkaSubscriber: ...
+            self,
+            *,
+            to: str,
+            partitions: Sequence[TopicPartition] = (),
+            retry: Union[bool, int] = False,
+            no_ack: Optional[bool] = False,
+            no_reply: Optional[bool] = False,
+            group_id: Optional[str] = None,
+    ) -> KafkaSubscriber:
+        ...
 
     @overload
     def subscribe(
-        self,
-        *,
-        to: Union[str, PubSub, ListSub, StreamSub],
-        sub_from: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
-        retry: Union[bool, int] = False,
-        no_ack: Optional[bool] = False,
-        no_reply: Optional[bool] = False,
-    ) -> RedisSubscriber: ...
+            self,
+            *,
+            to: Union[str, PubSub, ListSub, StreamSub],
+            sub_from: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
+            retry: Union[bool, int] = False,
+            no_ack: Optional[bool] = False,
+            no_reply: Optional[bool] = False,
+    ) -> RedisSubscriber:
+        ...
 
     def subscribe(
-        self,
-        *,
-        to: Union[str, RabbitQueue, PubSub, ListSub, StreamSub],
-        exchange: Union[str, RabbitExchange, None] = None,
-        retry: Union[bool, int] = False,
-        no_ack: Optional[bool] = False,
-        no_reply: Optional[bool] = False,
-        partitions: Sequence[TopicPartition] = (),
-        group_id: Optional[str] = None,
-        sub_from: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
-        auto_delete: Optional[bool] = False,
+            self,
+            *,
+            to: Union[str, RabbitQueue, PubSub, ListSub, StreamSub],
+            exchange: Union[str, RabbitExchange, None] = None,
+            retry: Union[bool, int] = False,
+            no_ack: Optional[bool] = False,
+            no_reply: Optional[bool] = False,
+            partitions: Sequence[TopicPartition] = (),
+            group_id: Optional[str] = None,
+            sub_from: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
+            auto_delete: Optional[bool] = False,
     ) -> Subscriber:
         match self.broker_type:
             case "rabbitmq":
@@ -333,14 +341,14 @@ class Broker(object):
 
     @classmethod
     def _redis_subscriber(
-        cls,
-        broker: RedisBroker,
-        *,
-        to: Union[str, PubSub, ListSub, StreamSub],
-        sub_from: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
-        retry: Union[bool, int] = False,
-        no_ack: Optional[bool] = False,
-        no_reply: Optional[bool] = False,
+            cls,
+            broker: RedisBroker,
+            *,
+            to: Union[str, PubSub, ListSub, StreamSub],
+            sub_from: Optional[Literal["pubsub", "list", "stream"]] = "pubsub",
+            retry: Union[bool, int] = False,
+            no_ack: Optional[bool] = False,
+            no_reply: Optional[bool] = False,
     ) -> RedisSubscriber:
         args = {}
         if isinstance(to, ListSub) or sub_from == "list":
@@ -353,15 +361,15 @@ class Broker(object):
 
     @classmethod
     def _rabbit_subscriber(
-        cls,
-        broker: RabbitBroker,
-        *,
-        to: Union[str, RabbitQueue],
-        exchange: Union[str, RabbitExchange, None] = None,
-        retry: Union[bool, int] = False,
-        no_ack: Optional[bool] = False,
-        no_reply: Optional[bool] = False,
-        auto_delete: bool = False,
+            cls,
+            broker: RabbitBroker,
+            *,
+            to: Union[str, RabbitQueue],
+            exchange: Union[str, RabbitExchange, None] = None,
+            retry: Union[bool, int] = False,
+            no_ack: Optional[bool] = False,
+            no_reply: Optional[bool] = False,
+            auto_delete: bool = False,
     ) -> RabbitSubscriber:
         queue = (
             create_rabbit_queue(
@@ -382,15 +390,15 @@ class Broker(object):
 
     @classmethod
     def _kafka_subscriber(
-        cls,
-        broker: KafkaBroker,
-        *,
-        to: str,
-        partitions: Sequence[TopicPartition] = (),
-        retry: Union[bool, int] = False,
-        no_ack: Optional[bool] = False,
-        no_reply: Optional[bool] = False,
-        group_id: Optional[str] = None,
+            cls,
+            broker: KafkaBroker,
+            *,
+            to: str,
+            partitions: Sequence[TopicPartition] = (),
+            retry: Union[bool, int] = False,
+            no_ack: Optional[bool] = False,
+            no_reply: Optional[bool] = False,
+            group_id: Optional[str] = None,
     ) -> KafkaSubscriber:
         return broker.subscriber(
             to,
@@ -403,12 +411,12 @@ class Broker(object):
 
     @classmethod
     def create_router(
-        cls,
-        url: BrokerUrl,
-        *,
-        connection_name: Optional[str] = None,
-        max_consumers: int = 5,
-        tls: bool = False,
+            cls,
+            url: BrokerUrl,
+            *,
+            connection_name: Optional[str] = None,
+            max_consumers: int = 5,
+            tls: bool = False,
     ) -> StreamRouter:
         url_str = url if isinstance(url, str) else url.unicode_string()
         if "redis" in url_str:
@@ -453,12 +461,12 @@ class KafkaRPCWorker:
             future.set_result(msg.body)
 
     async def request(
-        self,
-        data: SendableMessage,
-        topic: str,
-        timeout: float = 10.0,
-        headers: Optional[dict[str, str]] = None,
-        **kwargs,
+            self,
+            data: SendableMessage,
+            topic: str,
+            timeout: float = 10.0,
+            headers: Optional[dict[str, str]] = None,
+            **kwargs,
     ) -> bytes:
         correlation_id = Crypto.uuidv7()
         future = self.responses[correlation_id] = Future[bytes]()
@@ -509,7 +517,7 @@ class BrokerMessage(BaseModel):
 
 
 def _prepare_message(
-    message: AnyStr | dict | PydanticBaseModel,
+        message: AnyStr | dict | PydanticBaseModel,
 ) -> Union[PydanticBaseModel, BrokerMessage]:
     if isinstance(message, PydanticBaseModel):
         return message

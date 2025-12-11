@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable, Optional, Union, cast
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from faststream._internal.fastapi.router import StreamRouter
+from faststream._internal.fastapi.router import StreamRouter  # noqa
 from loguru import logger
 from socketio import ASGIApp as SocketIOASGIApp
 from socketio import AsyncServer as SocketIOAsyncServer
