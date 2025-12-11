@@ -69,10 +69,10 @@ class API(FastAPI):
         self._lifespan = lifespan
         self._before_start = before_start
         self._before_finish = before_finish
-        self.name = name
+        self.name = name or "python-sdk API"
         self.description = description
-        self.version = version
-        self.debug = debug
+        self.version = version or "0.1.0"
+        self.debug = debug or settings.debug or False
         self.openapi_url = openapi_url
         self.docs_url = docs_url
 
