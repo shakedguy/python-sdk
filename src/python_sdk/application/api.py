@@ -9,12 +9,14 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from faststream._internal.fastapi.router import StreamRouter  # noqa
 from loguru import logger
+from pydantic import IPvAnyAddress, PositiveInt, StrictBool
 from socketio import ASGIApp as SocketIOASGIApp
 from socketio import AsyncServer as SocketIOAsyncServer
 from starlette.types import Lifespan
 
 from .. import settings
 from ..conf.logger import configure_logger
+from ..domain import PathLike
 from ..infrastructure import cleanup_async, init_async
 from ..infrastructure.messaging import Broker
 from ..utils.decorators.async_decorators import to_async
@@ -156,12 +158,12 @@ class API(FastAPI):
     @classmethod
     def run(
             cls,
-            app_path: str,
+            app_path: PathLike,
             *,
-            host: str = "0.0.0.0",
-            port: int = 8000,
-            reload: bool = False,
-            workers: int = 1,
+            host: Union[str,IPvAnyAddress]  = IPvAnyAddress("0.0.0.0"),
+            port: PositiveInt = 8000,
+            reload: StrictBool = False,
+            workers: PositiveInt = 1,
             log_level: Union[str, int] = "INFO",
     ) -> None:
         configure_logger()
@@ -171,8 +173,8 @@ class API(FastAPI):
         )
 
         uvicorn.run(
-            app_path,
-            host=host,
+            str(app_path),
+            host=str(host),
             port=port,
             reload=reload,
             log_level=log_level.upper() if isinstance(log_level, str) else log_level,
