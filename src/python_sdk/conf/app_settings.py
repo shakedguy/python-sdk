@@ -25,7 +25,7 @@ from urllib3.util import parse_url
 PathField = Annotated[Path, BeforeValidator(lambda x: Path(x))]
 
 BooleanField = Annotated[
-    bool, BeforeValidator(lambda x: str(x) == "1" or str(x).lower() == "true")
+    bool, BeforeValidator(lambda x: str(x).lower() not in ["0","false"])
 ]
 
 BrokerDsn = Union[AmqpDsn, RedisDsn, KafkaDsn]
