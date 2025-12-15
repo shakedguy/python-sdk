@@ -32,14 +32,17 @@ import time
 import sys
 
 PY3 = sys.version_info[0] == 3
-
 if PY3:
-    import _thread as thread
+    _ord = lambda x: x
+else:
+    _ord = ord
+if PY3:
     import codecs
-    from io import BytesIO as StringIO
+
     MAXSIZE = sys.maxsize
 
     imap = map
+
 
     def b(s):
         # BSON and socket operations deal in binary data. In
@@ -49,20 +52,26 @@ if PY3:
         # See http://python3porting.com/problems.html#nicer-solutions
         return codecs.latin_1_encode(s)[0]
 
+
     def bytes_from_hex(h):
         return bytes.fromhex(h)
+
 
     def iteritems(d):
         return iter(d.items())
 
+
     def itervalues(d):
         return iter(d.values())
+
 
     def reraise(exctype, value, trace=None):
         raise exctype(str(value)).with_traceback(trace)
 
+
     def _unicode(s):
         return s
+
 
     text_type = str
     string_type = str
@@ -71,6 +80,7 @@ else:
     from itertools import imap
 
     import thread
+
     try:
         from cStringIO import StringIO
     except ImportError:
@@ -78,18 +88,23 @@ else:
 
     MAXSIZE = sys.maxint
 
+
     def b(s):
         # See comments above. In python 2.x b('foo') is just 'foo'.
         return s
 
+
     def bytes_from_hex(h):
         return h.decode('hex')
+
 
     def iteritems(d):
         return d.iteritems()
 
+
     def itervalues(d):
         return d.itervalues()
+
 
     # "raise x, y, z" raises SyntaxError in Python 3
     exec("""def reraise(exctype, value, trace=None):
@@ -101,6 +116,8 @@ else:
     string_type = basestring
     text_type = unicode
     integer_types = (int, long)
+
+
 # http://isthe.com/chongo/tech/comp/fnv/index.html#FNV-1a
 def _fnv_1a_24(data, _ord=_ord):
     """FNV-1a 24 bit hash"""
@@ -115,6 +132,7 @@ def _fnv_1a_24(data, _ord=_ord):
     # xor-fold the result to 24 bit.
     return (fnv_1a_hash >> 24) ^ (fnv_1a_hash & 0xffffff)
 
+
 def _machine_bytes():
     """Get the machine portion of an ObjectId.
     """
@@ -128,16 +146,12 @@ class InvalidId(ValueError):
     """Raised when trying to create an ObjectId from invalid data.
     """
 
+
 def _raise_invalid_id(oid):
     raise InvalidId(
         "%r is not a valid ObjectId, it must be a 12-byte input"
         " or a 24-character hex string" % oid)
 
-
-if PY3:
-    _ord = lambda x: x
-else:
-    _ord = ord
 
 class ObjectId(object):
     """A MongoDB ObjectId.
