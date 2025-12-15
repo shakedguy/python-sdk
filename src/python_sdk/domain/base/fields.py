@@ -2,8 +2,6 @@ from datetime import datetime
 from typing import Annotated, Any, Optional, TypeVar, Union
 from uuid import UUID
 
-from bson.errors import InvalidId
-from bson.objectid import ObjectId
 from pydantic import (
     BeforeValidator,
     GetCoreSchemaHandler,
@@ -17,9 +15,15 @@ from pydantic_core.core_schema import (
     ValidationInfo,
 )
 
+from ...conf.constants import BSON_EXISTS
 from ...utils import DateTime
 from ...utils.crypto import to_object_id_str, uuidv7
 from ...utils.strings import to_str
+
+if BSON_EXISTS:
+    from bson.objectid import ObjectId
+else:
+    from .object_id import ObjectId
 
 T = TypeVar("T")
 
@@ -98,7 +102,9 @@ def _parse_entity_id(value: Any) -> Optional[Union[int, str]]:
         return None
     if isinstance(value, (int, float)):
         return int(value)
-    if isinstance(value, (ObjectId, DocumentID, UUID)):
+    if isinstance(value, (DocumentID, UUID)):
+        return str(value)
+    if BSON_EXISTS and isinstance(value, ObjectId):
         return str(value)
     if isinstance(value, (str, bytes, bytearray, memoryview)):
         val = to_str(value)
@@ -183,7 +189,7 @@ class DocumentID(ObjectId):
             v = v.decode("utf-8")
         try:
             return cls(v)
-        except (InvalidId, TypeError) as e:
+        except Exception as e:
             raise ValueError("Id must be of type PydanticObjectId") from e
 
     @classmethod

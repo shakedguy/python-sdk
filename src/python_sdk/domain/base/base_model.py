@@ -3,7 +3,6 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Any, Literal, Union, cast, override
 
-from bson.objectid import ObjectId
 from pydantic import (
     BaseModel as PydanticBaseModel,
 )
@@ -13,12 +12,16 @@ from pydantic import (
     model_validator,
 )
 
+from ...conf.constants import BSON_EXISTS
 from ...utils import ChangeKeysCase, DateTime, dict_or_pydantic_model_to_dict, mixins
 from .fields import DateTimeField, DocumentID
 
+if BSON_EXISTS:
+    from bson.objectid import ObjectId
+
 
 def base_validate_before(
-    data: Union[PydanticBaseModel, dict[str, Any]],
+        data: Union[PydanticBaseModel, dict[str, Any]],
 ) -> dict[str, Any]:
     if not isinstance(data, (PydanticBaseModel, dict)):
         raise ValueError("Invalid data type, must be a dict or Pydantic model")
@@ -30,18 +33,20 @@ def base_validate_before(
 def _serialize_field(value: Any, mode: Literal["json", "dict"] = "dict") -> Any:
     if isinstance(value, (PydanticBaseModel, dict, list, set, tuple)):
         return base_serializer(value)
-    if isinstance(value, (ObjectId, DocumentID)):
+    if isinstance(value, DocumentID):
         return DocumentID(str(value)) if mode == "dict" else str(value)
+    if BSON_EXISTS and isinstance(value, ObjectId):
+        return str(value)
     return value
 
 
 def base_serializer(
-    model: Union[
-        PydanticBaseModel,
-        dict[str, Any],
-        list[Union[PydanticBaseModel, dict[str, Any]]],
-    ],
-    mode: Literal["json", "dict"] = "dict",
+        model: Union[
+            PydanticBaseModel,
+            dict[str, Any],
+            list[Union[PydanticBaseModel, dict[str, Any]]],
+        ],
+        mode: Literal["json", "dict"] = "dict",
 ) -> Any:
     if isinstance(model, (list, set, tuple)):
         return [base_serializer(item) for item in model]
@@ -83,7 +88,7 @@ class BaseModel(PydanticBaseModel, mixins.DictMixin):
     @model_validator(mode="before")
     @classmethod
     def validate_before(
-        cls, data: Union[PydanticBaseModel, dict[str, Any]]
+            cls, data: Union[PydanticBaseModel, dict[str, Any]]
     ) -> dict[str, Any]:
         return base_validate_before(data)
 
