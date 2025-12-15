@@ -1,13 +1,10 @@
-try:
-    from .mongo import Mongo, MongoClients, MongoCollection
-except:
-    pass
+import importlib.util
 
-try:
+if importlib.util.find_spec("pymongo") is not None:
+    from .mongo import Mongo, MongoClients, MongoCollection
+
+if importlib.util.find_spec("psycopg") is not None:
     from .postgres import Postgres, PostgresConnectionPool
-except:
-    pass
-try:
+
+if importlib.util.find_spec("qdrant_client") is not None:
     from .qdrant import Qdrant
-except:
-    pass
