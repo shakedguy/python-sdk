@@ -18,7 +18,6 @@ from .. import settings
 from ..conf.logger import configure_logger
 from ..domain import PathLike
 from ..infrastructure import cleanup_async, init_async
-from ..infrastructure.messaging import Broker
 from ..utils.decorators.async_decorators import to_async
 from .socketio import create_socketio_app
 from .websocket import ConnectionManager, create_connection_manager
@@ -62,11 +61,6 @@ class API(FastAPI):
         self._init_mongo = init_mongo
         self._init_messaging = init_messaging
         self._init_qdrant = init_qdrant
-        if init_messaging:
-            self._broker_router = Broker.create_router(
-                settings.broker.url, tls=settings.broker.use_ssl
-            )
-            self.broker = Broker(settings.broker.url, tls=settings.broker.use_ssl)
         self._lifespan = lifespan
         self._before_start = before_start
         self._before_finish = before_finish
@@ -78,9 +72,17 @@ class API(FastAPI):
         self.docs_url = docs_url
         if importlib.util.find_spec("faststream") is not None:
             from faststream._internal.fastapi.router import StreamRouter  # noqa
+
             self._broker_router: Optional[StreamRouter] = None
+            if init_messaging:
+                from ..infrastructure.messaging import Broker
+                self._broker_router = Broker.create_router(
+                    settings.broker.url, tls=settings.broker.use_ssl
+                )
+                self.broker = Broker(settings.broker.url, tls=settings.broker.use_ssl)
         else:
             self._broker_router = None
+            self.broker = None
 
 
         @asynccontextmanager
