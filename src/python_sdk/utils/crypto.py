@@ -13,23 +13,25 @@ from .strings import AnyStr, to_base64, to_hex, to_str
 
 if BSON_EXISTS:
     from bson.objectid import ObjectId
+else:
+    from ..domain.base.object_id import ObjectId
 
 
-    def to_object_id(id_: Union[AnyStr, UUID, ObjectId]) -> Optional[ObjectId]:
-        if isinstance(id_, ObjectId):
-            return id_
-        if isinstance(id_, UUID):
-            return ObjectId(id_.bytes.hex()[:24])
+def to_object_id(id_: Union[AnyStr, UUID, ObjectId]) -> Optional[ObjectId]:
+    if isinstance(id_, ObjectId):
+        return id_
+    if isinstance(id_, UUID):
+        return ObjectId(id_.bytes.hex()[:24])
 
-        try:
-            return ObjectId(id_)
-        except:  # noqa
-            return ObjectId(UUID(id_).bytes.hex()[:24])
+    try:
+        return ObjectId(id_)
+    except:  # noqa
+        return ObjectId(UUID(id_).bytes.hex()[:24])
 
 
-    def to_object_id_str(id_: Union[AnyStr, UUID, ObjectId]) -> Optional[str]:
-        object_id = to_object_id(id_)
-        return str(object_id) if object_id else None
+def to_object_id_str(id_: Union[AnyStr, UUID, ObjectId]) -> Optional[str]:
+    object_id = to_object_id(id_)
+    return str(object_id) if object_id else None
 
 
 def encrypt_password(password: str, salt: str) -> str:
