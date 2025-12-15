@@ -71,7 +71,6 @@ dependencies = [
     "inflect>=7.5.0",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",
-    "motor>=3.7.1",
     "ollama>=0.5.3",
     "orjson>=3.10.18",
     "phonenumbers>=9.0.2",
@@ -82,7 +81,6 @@ dependencies = [
     "pydantic-settings>=2.8.1",
     "pydantic[email]>=2.11.2",
     "pydash>=8.0.5",
-    "pymongo>=4.15.5",
     "python-dateutil>=2.9.0.post0",
     "python-levenshtein>=0.27.1",
     "python-socketio>=5.13.0",
@@ -108,6 +106,9 @@ dev = [
     "ruff>=0.11.3",
     "types-cachetools>=6.2.0.20250827",
 ]
+
+[project.optional-dependencies]
+mongo = ["pymongo>=4.15.5","motor==3.7.1"]
 
 [tool.mypy]
 python_version = "3.13"

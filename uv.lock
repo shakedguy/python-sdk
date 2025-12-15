@@ -1832,6 +1832,11 @@ dependencies = [
     { name = "uvicorn" },
 ]
 
+[package.optional-dependencies]
+kafka = [
+    { name = "pymongo" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "icecream" },
@@ -1873,6 +1878,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.10.1" },
     { name = "pydash", specifier = ">=8.0.5" },
     { name = "pymongo", specifier = ">=4.9,<5" },
+    { name = "pymongo", marker = "extra == 'kafka'", specifier = ">=4.15.5" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "python-levenshtein", specifier = ">=0.27.1" },
     { name = "python-socketio", specifier = ">=5.13.0" },
@@ -1884,6 +1890,7 @@ requires-dist = [
     { name = "taskiq-faststream", specifier = ">=0.3.2" },
     { name = "uvicorn", specifier = ">=0.38.0" },
 ]
+provides-extras = ["kafka"]
 
 [package.metadata.requires-dev]
 dev = [

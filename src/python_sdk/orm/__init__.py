@@ -1,2 +1,10 @@
-from .mongo import *
-from .sql import *
+try:
+    from .mongo import *
+except:
+    pass
+
+try:
+    from .sql import *
+except:
+    pass
+
