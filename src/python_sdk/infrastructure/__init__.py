@@ -121,7 +121,8 @@ async def init_async(
         tasks.append(init_qdrant_async())
 
     try:
-        await asyncio.gather(*tasks)
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
     except Exception as e:
         logger.error(f"Failed to initialize resources: {e}")
         sys.exit(1)
@@ -216,4 +217,4 @@ def init_qdrant_async() -> Awaitable:
         pass
     except Exception as e:
         logger.error(f"Failed to initialize Qdrant clients async: {e}")
-        return asyncio.sleep(0)
+    return asyncio.sleep(0)
