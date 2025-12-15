@@ -19,7 +19,8 @@ from ...conf import settings
 from ...domain.base.fields import DateTimeField, UUIDField
 from ...infrastructure.db import Qdrant
 from ...orm.qdrant import QdrantCommandsMixin, QdrantQueriesMixin
-from ...utils import Crypto, DateTime, find_subclasses
+from ...utils import DateTime, find_subclasses
+from ...utils.crypto import uuidv7_to_datetime
 from ._documents import BaseDocument, DocumentIndex
 
 
@@ -57,7 +58,7 @@ class QdrantDocument(BaseDocument, QdrantQueriesMixin, QdrantCommandsMixin):
 
     @cached_property
     def created_at(self) -> Optional[datetime]:
-        return Crypto.uuidv7_to_datetime(self.id) if self.id else None
+        return uuidv7_to_datetime(self.id) if self.id else None
 
     @staticmethod
     def get_all_documents() -> Collection[Type[QdrantDocument]]:

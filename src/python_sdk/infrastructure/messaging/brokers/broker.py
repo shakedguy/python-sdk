@@ -27,7 +27,9 @@ from pydantic import BaseModel as PydanticBaseModel
 
 from ....conf.app_settings import settings
 from ....domain.base.base_model import BaseModel
-from ....utils import Crypto, DateTime, Strings
+from ....utils import DateTime
+from ....utils.crypto import uuidv7
+from ....utils.strings import slugify
 from ..queues import create_rabbit_queue
 from .kafka import KafkaBrokerFactory
 from .rabbitmq import RabbitMQBrokerFactory
@@ -74,7 +76,7 @@ class Broker(object):
 
         connection_name = connection_name or "buzzerpy"
         self.connection_name: Optional[str] = (
-            f"{Strings.slugify(connection_name)}:{Crypto.uuidv7()[:12]}"
+            f"{slugify(connection_name)}:{uuidv7()[:12]}"
         )
         self._broker: Union[RabbitBroker, RedisBroker, KafkaBroker]
 
@@ -468,7 +470,7 @@ class KafkaRPCWorker:
             headers: Optional[dict[str, str]] = None,
             **kwargs,
     ) -> bytes:
-        correlation_id = Crypto.uuidv7()
+        correlation_id = uuidv7()
         future = self.responses[correlation_id] = Future[bytes]()
 
         await self.broker.publish(
@@ -491,7 +493,7 @@ class KafkaRPCWorker:
 
 class BrokerMessage(BaseModel):
     message_id: str = Field(
-        default_factory=Crypto.uuidv7,
+        default_factory=uuidv7,
         title="Message ID",
         description="Unique identifier for the message",
     )

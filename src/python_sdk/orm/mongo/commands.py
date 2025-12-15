@@ -35,8 +35,10 @@ from pymongo.synchronous.collection import ReturnDocument
 
 from ...errors import ConcurrencyError, NotExistsError
 from ...infrastructure.db import Mongo, MongoCollection
-from ...utils import Crypto, DateTime, Strings
+from ...utils import DateTime
+from ...utils.crypto import to_object_id_str
 from ...utils.objects import model_dump
+from ...utils.strings import to_plural, to_snake_case
 
 DocumentType = TypeVar("DocumentType", bound=BaseModel)
 
@@ -48,8 +50,8 @@ ReplaceOneItem = tuple[Mapping[str, Any], Union[Mapping[str, Any], DocumentType]
 class MongoCommandsMixin(Generic[DocumentType]):
     @classmethod
     def get_collection_name(cls) -> str:
-        return getattr(cls.Meta, "collection_name", None) or Strings.to_snake_case(  # noqa
-            Strings.to_plural(cls.__name__)
+        return getattr(cls.Meta, "collection_name", None) or to_snake_case(  # noqa
+            to_plural(cls.__name__)
         )
 
     @classmethod
@@ -440,7 +442,7 @@ class DocumentID(ObjectId):
 
     @staticmethod
     def from_uuid(id_: Union[UUID, str]) -> "DocumentID":
-        return DocumentID(Crypto.to_object_id_str(id_))
+        return DocumentID(to_object_id_str(id_))
 
 
 def _create_document_id(value: Any) -> Optional[DocumentID]:

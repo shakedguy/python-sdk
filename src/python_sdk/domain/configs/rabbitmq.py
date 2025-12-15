@@ -14,7 +14,8 @@ from pydantic import (
 )
 
 from ...conf.app_settings import settings
-from ...utils import Crypto, Strings
+from ...utils.crypto import generate_random_id
+from ...utils.strings import slugify
 from ..base.base_model import BaseModel, base_validate_before
 
 _URLField: Optional[str] = Annotated[
@@ -187,4 +188,4 @@ class RabbitClientProperties(BaseModel):
     @field_validator("connection_name", mode="before")
     @classmethod
     def validate_connection_name(cls, value: Optional[str]) -> str:
-        return f"{Strings.slugify(value or 'buzzerpy')}:{Crypto.generate_random_id(8, encoding='hex', case='upper')}"
+        return f"{slugify(value or 'buzzerpy')}:{generate_random_id(8, encoding='hex', case='upper')}"

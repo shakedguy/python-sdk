@@ -18,7 +18,13 @@ import pydash as _
 from pydantic import BaseModel
 
 from . import is_iterable_except_str_like
-from .strings import Strings
+from .strings import (
+    to_camel_case,
+    to_constant_case,
+    to_kebab_case,
+    to_pascale_case,
+    to_snake_case,
+)
 
 ValidIterables = Union[dict[str, Any], Collection[Any]]
 
@@ -155,7 +161,7 @@ class ChangeKeysCase(ABC):  # noqa
         Returns:
             dict[str, Any] | Collection[Any]: The object with keys converted to camel case.
         """
-        return ChangeKeysCase._change_case(input_obj, Strings.to_camel_case, deep)
+        return ChangeKeysCase._change_case(input_obj, to_camel_case, deep)
 
     @staticmethod
     def to_snake_case(input_obj: ValidIterables, deep: bool = True) -> ValidIterables:
@@ -170,7 +176,7 @@ class ChangeKeysCase(ABC):  # noqa
             dict[str, Any] | Collection[Any]: The object with keys converted to snake case.
 
         """
-        return ChangeKeysCase._change_case(input_obj, Strings.to_snake_case, deep)
+        return ChangeKeysCase._change_case(input_obj, to_snake_case, deep)
 
     @staticmethod
     def to_kebab_case(input_obj: ValidIterables, deep: bool = True) -> ValidIterables:
@@ -184,7 +190,7 @@ class ChangeKeysCase(ABC):  # noqa
         Returns:
             dict[str, Any] | Collection[Any]: The object with keys converted to kebab case.
         """
-        return ChangeKeysCase._change_case(input_obj, Strings.to_kebab_case, deep)
+        return ChangeKeysCase._change_case(input_obj, to_kebab_case, deep)
 
     @staticmethod
     def to_pascal_case(input_obj: ValidIterables, deep: bool = True) -> ValidIterables:
@@ -198,7 +204,7 @@ class ChangeKeysCase(ABC):  # noqa
         Returns:
             dict[str, Any] | Collection[Any]: The object with keys converted to pascal case.
         """
-        return ChangeKeysCase._change_case(input_obj, Strings.to_pascale_case, deep)
+        return ChangeKeysCase._change_case(input_obj, to_pascale_case, deep)
 
     @staticmethod
     def to_constant_case(
@@ -214,7 +220,7 @@ class ChangeKeysCase(ABC):  # noqa
         Returns:
             dict[str, Any] | Collection[Any]: The object with keys converted to constant case.
         """
-        return ChangeKeysCase._change_case(input_obj, Strings.to_constant_case, deep)
+        return ChangeKeysCase._change_case(input_obj, to_constant_case, deep)
 
     @staticmethod
     def to_dot_case(input_obj: ValidIterables) -> ValidIterables:
@@ -350,8 +356,8 @@ class ChangeKeysCase(ABC):  # noqa
                         _.camel_case(key): new_value,
                         _.snake_case(key): new_value,
                         _.kebab_case(key): new_value,
-                        Strings.to_pascale_case(key): new_value,
-                        Strings.to_constant_case(key): new_value,
+                        to_pascale_case(key): new_value,
+                        to_constant_case(key): new_value,
                     }
                 )
 

@@ -7,7 +7,7 @@ class ConcurrencyError(Exception):
     """
 
     def __init__(self, collection_name: str, pk: Any):
-        from ..utils import Strings
+        from ..utils.strings import to_singular
 
         """
         Initializes a new instance of the ConcurrencyError class.
@@ -17,5 +17,5 @@ class ConcurrencyError(Exception):
             pk (str): The primary key of the record.
         """
         super().__init__(
-            f"{Strings.to_singular(collection_name).title()} with ID '{pk}' was updated or deleted by another transaction."
+            f"{to_singular(collection_name).title()} with ID '{pk}' was updated or deleted by another transaction."
         )

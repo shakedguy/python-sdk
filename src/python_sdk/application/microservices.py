@@ -15,7 +15,8 @@ from ..infrastructure.messaging import (
     BrokerUrl,
     health_check_exchange,
 )
-from ..utils import Crypto, Strings
+from ..utils.crypto import generate_random_id
+from ..utils.strings import slugify
 from .scheduler import Scheduler
 
 
@@ -37,10 +38,10 @@ class Microservice(object):
         max_consumers: int = 5,
         tls: bool = False,
     ):
-        pod_name = settings.kube.pod_name or Crypto.generate_random_id(
+        pod_name = settings.kube.pod_name or generate_random_id(
             8, encoding="hex", case="upper"
         )
-        self.name: str = f"{Strings.slugify(name or 'python-microservice')}:{pod_name}"
+        self.name: str = f"{slugify(name or 'python-microservice')}:{pod_name}"
         self.description: str = description or self.name
         self.version: str = version or "0.1.0"
         self.broker = Broker(

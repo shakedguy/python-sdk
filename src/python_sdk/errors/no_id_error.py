@@ -12,8 +12,8 @@ class NoIdError(Exception):
             entity_name (str): The name of the entity that does not have an ID value set.
         """
 
-        from ..utils import Strings
+        from ..utils.strings import to_singular
 
         super().__init__(
-            f"{Strings.to_singular(entity_name).title()} does not have an ID value set."
+            f"{to_singular(entity_name).title()} does not have an ID value set."
         )

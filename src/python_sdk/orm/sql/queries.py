@@ -16,7 +16,7 @@ from pydantic import BaseModel, create_model
 from typing_extensions import Generic
 
 from ...infrastructure.db import Postgres
-from ...utils import Strings
+from ...utils.strings import to_str
 from ..base import FindAsyncResult, FindResult
 from .parsers import parse_filter
 
@@ -63,7 +63,7 @@ class SQLQueriesMixin(Generic[EntityType]):
         columns = cls.get_columns() if hasattr(cls, "get_columns") else set(vars(cls).keys())
 
         for arg in args:
-            column = Strings.to_str(text=arg)
+            column = to_str(text=arg)
             if column not in columns:
                 raise ValueError(f"table {cls.get_table_name()} has no column {column}") # noqa
             cls.__selected_columns__.add(column)

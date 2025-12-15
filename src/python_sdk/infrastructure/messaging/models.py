@@ -6,7 +6,8 @@ from pydantic import Field, model_validator
 
 from ...domain.base.base_model import BaseModel, base_validate_before
 from ...domain.base.fields import DateTimeField, UUIDField
-from ...utils import Crypto, DateTime
+from ...utils import DateTime
+from ...utils.crypto import uuidv7
 
 
 class BaseMessageBody(BaseModel):
@@ -19,7 +20,7 @@ class BaseMessageBody(BaseModel):
     """
 
     id: UUIDField = Field(
-        default_factory=Crypto.uuidv7,
+        default_factory=uuidv7,
         title="Message ID",
         description="The unique identifier of the message",
     )
@@ -50,7 +51,7 @@ class BaseMessage(BaseModel, Generic[MessageBody]):
     """
 
     id: UUIDField = Field(
-        default_factory=Crypto.uuidv7,
+        default_factory=uuidv7,
         title="Message ID",
         description="The unique identifier of the message",
     )
@@ -77,7 +78,7 @@ class BaseMessage(BaseModel, Generic[MessageBody]):
             return value
 
         value = base_validate_before(value)
-        value.setdefault("id", Crypto.uuidv7())
+        value.setdefault("id", uuidv7())
         value.setdefault("timestamp", DateTime.utc_now())
         value.setdefault("data", dict())
         value["data"]["id"] = value["data"].get("id", value["id"])

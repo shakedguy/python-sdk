@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from qdrant_client.models import FieldCondition, Filter, Match, MatchAny, MatchText
 
 from ...infrastructure.db import Qdrant
-from ...utils import Strings
+from ...utils.strings import to_plural, to_snake_case
 from ..base import FindAsyncResult, FindResult
 
 DocumentType = TypeVar("DocumentType", bound=BaseModel)
@@ -23,8 +23,8 @@ class QdrantQueriesMixin(Generic[DocumentType]):
 
     @classmethod
     def get_collection_name(cls) -> str:
-        return getattr(cls.Meta, "collection_name", None) or Strings.to_snake_case(  # noqa
-            Strings.to_plural(cls.__name__)
+        return getattr(cls.Meta, "collection_name", None) or to_snake_case(  # noqa
+            to_plural(cls.__name__)
         )
 
     @classmethod

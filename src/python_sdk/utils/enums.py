@@ -1,17 +1,17 @@
 import enum
 from typing import Any, AnyStr, Optional, Self, Union
 
-from ..utils import Strings
+from ..utils.strings import to_snake_case, to_str
 from ._lazy import Promise
 
 
 class StrEnum(enum.StrEnum):
     @classmethod
     def _missing_(cls, value: AnyStr) -> Optional[Self]:
-        key = Strings.to_snake_case(text=Strings.to_str(text=value).lower())
+        key = to_snake_case(text=to_str(text=value).lower())
 
         for member in cls:
-            if Strings.to_snake_case(text=member) == key:
+            if to_snake_case(text=member) == key:
                 return member
         return None
 
@@ -25,10 +25,10 @@ class IntEnum(enum.IntEnum):
         if isinstance(value, int):
             return value if value in [member for member in cls] else None
 
-        key = Strings.to_snake_case(text=Strings.to_str(text=value))
+        key = to_snake_case(text=to_str(text=value))
 
         for member in cls:
-            if Strings.to_snake_case(text=member.name) == key:
+            if to_snake_case(text=member.name) == key:
                 return member
         return None
 
@@ -111,10 +111,10 @@ class IntegerChoices(Choices, IntEnum):
         if isinstance(value, int):
             return value if value in [member for member in cls] else None
 
-        key = Strings.to_snake_case(text=Strings.to_str(text=value).lower())
+        key = to_snake_case(text=to_str(text=value).lower())
 
         for member in cls:
-            if Strings.to_snake_case(text=member.name) == key:
+            if to_snake_case(text=member.name) == key:
                 return member
         return None
 
@@ -128,10 +128,10 @@ class TextChoices(Choices, StrEnum):
 
     @classmethod
     def _missing_(cls, value: AnyStr) -> Optional[Self]:
-        key = Strings.to_snake_case(text=Strings.to_str(text=value).lower())
+        key = to_snake_case(text=to_str(text=value).lower())
 
         for member in cls:
-            if Strings.to_snake_case(text=member) == key:
+            if to_snake_case(text=member) == key:
                 return member
         return None
 

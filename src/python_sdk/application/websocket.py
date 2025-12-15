@@ -6,7 +6,8 @@ from fastapi.websockets import WebSocketState
 from loguru import logger
 from pydantic import BaseModel
 
-from ..utils import Crypto, memoize
+from ..utils import memoize
+from ..utils.crypto import uuidv7
 from ..utils.decorators import singleton
 
 
@@ -123,7 +124,7 @@ class ConnectionManager(object):
 
         req: SocketRequest = {
             "event": event,
-            "req_id": str(Crypto.uuidv7()),
+            "req_id": str(uuidv7()),
             "data": payload,
         }
         return await self.__request_handler(sid=sid, req=req)
@@ -131,11 +132,11 @@ class ConnectionManager(object):
     async def broadcast_request(
             self, event: str, payload: Optional[Union[str, dict[str, Any]]] = None
     ) -> list[Any]:
-        req_id: str = str(Crypto.uuidv7())
+        req_id: str = str(uuidv7())
         self.pending_requests[req_id] = asyncio.Future()
         message: SocketRequest = {
             "event": event,
-            "req_id": str(Crypto.uuidv7()),
+            "req_id": str(uuidv7()),
             "data": payload,
         }
 

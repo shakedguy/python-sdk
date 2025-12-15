@@ -7,7 +7,7 @@ from dateutil import parser
 from dateutil.relativedelta import relativedelta
 
 from ..conf import constants
-from .strings import Strings
+from .strings import to_str
 
 Unit = Literal["seconds", "minutes", "hours", "days", "weeks", "months", "years"]
 
@@ -365,7 +365,7 @@ class DateTime(datetime):
             if not time.tzinfo or time.tzinfo != ZoneInfo("UTC"):
                 dt = dt.replace(tzinfo=ZoneInfo("UTC"))
             return DateTime.from_datetime(dt)
-        dt = Strings.to_str(dt) if isinstance(dt, (str, bytes)) else dt
+        dt = to_str(dt) if isinstance(dt, (str, bytes)) else dt
         if isinstance(dt, str):
             dt = cls.from_str(dt)
             if dt:
@@ -379,7 +379,7 @@ class DateTime(datetime):
 
     @staticmethod
     def is_valid_datetime(dt_str: AnyStr) -> bool:
-        res = Strings.to_str(dt_str)
+        res = to_str(dt_str)
         try:
             parser.parse(res)
             return True

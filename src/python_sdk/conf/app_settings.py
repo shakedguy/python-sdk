@@ -249,9 +249,9 @@ class KubernetesSettings(BaseSettings):
     @classmethod
     def validate_pod_name(cls, value: Optional[str]) -> str:
         if not value:
-            from ..utils import Crypto
+            from ..utils.crypto import uuidv7
 
-            value = f"pod-{Crypto.uuidv7()}"
+            value = f"pod-{uuidv7()}"
 
         return value
 

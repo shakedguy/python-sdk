@@ -8,7 +8,8 @@ from pydantic import (
 )
 
 from ...domain.base.base_model import BaseModel
-from ...utils import Strings, enums
+from ...utils import enums
+from ...utils.strings import to_plural, to_snake_case
 
 ASCENDING = 1
 DESCENDING = -1
@@ -70,8 +71,8 @@ class BaseDocument(BaseModel):
 
     @classmethod
     def get_collection_name(cls) -> str:
-        return getattr(cls.Meta, "collection_name", None) or Strings.to_snake_case(
-            Strings.to_plural(cls.__name__)
+        return getattr(cls.Meta, "collection_name", None) or to_snake_case(
+            to_plural(cls.__name__)
         )
 
     @classmethod

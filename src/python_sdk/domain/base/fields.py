@@ -17,7 +17,9 @@ from pydantic_core.core_schema import (
     ValidationInfo,
 )
 
-from ...utils import Crypto, DateTime, Strings
+from ...utils import DateTime
+from ...utils.crypto import to_object_id_str, uuidv7
+from ...utils.strings import to_str
 
 T = TypeVar("T")
 
@@ -99,7 +101,7 @@ def _parse_entity_id(value: Any) -> Optional[Union[int, str]]:
     if isinstance(value, (ObjectId, DocumentID, UUID)):
         return str(value)
     if isinstance(value, (str, bytes, bytearray, memoryview)):
-        val = Strings.to_str(value)
+        val = to_str(value)
         return int(val) if val.isnumeric() else val
     return str(value)
 
@@ -111,7 +113,7 @@ EntityIDField = Annotated[
 
 def to_default_entity_id(value: Any) -> Union[str, int]:
     if value is None or isinstance(value, (UUID, str)):
-        return value or Crypto.uuidv7()
+        return value or uuidv7()
     if isinstance(value, (int, float)):
         return int(value)
     if isinstance(value, (bytes, bytearray, memoryview)):
@@ -222,7 +224,7 @@ class DocumentID(ObjectId):
 
     @staticmethod
     def from_uuid(id_: Union[UUID, str]) -> "DocumentID":
-        return DocumentID(Crypto.to_object_id_str(id_))
+        return DocumentID(to_object_id_str(id_))
 
 
 def _create_document_id(value: Any) -> Optional[DocumentID]:

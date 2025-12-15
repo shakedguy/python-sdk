@@ -7,7 +7,7 @@ class NotExistsError(Exception):
     """
 
     def __init__(self, entity_name: str, pk: Any):
-        from ..utils import Strings
+        from ..utils.strings import to_singular
 
         """
         Initializes a new instance of the NotExistsError class.
@@ -17,5 +17,5 @@ class NotExistsError(Exception):
             pk (Any): The ID of the entity that does not exist.
         """
         super().__init__(
-            f"{Strings.to_singular(entity_name).title()} with ID '{pk}' does not exist."
+            f"{to_singular(entity_name).title()} with ID '{pk}' does not exist."
         )

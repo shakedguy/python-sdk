@@ -5,7 +5,8 @@ from pydantic import Field
 from ...errors import NoIdError
 from ...orm.sql.commands import SQLCommandsMixin
 from ...orm.sql.queries import SQLQueriesMixin
-from ...utils import DateTime, Strings, enums
+from ...utils import DateTime, enums
+from ...utils.strings import to_plural, to_snake_case
 from ..base.base_model import BaseModel
 from ..base.fields import DateTimeField, EntityIDField
 
@@ -76,7 +77,7 @@ class BaseEntity(BaseModel):
         return getattr(
             cls.Meta,
             "table_name",
-            Strings.to_snake_case(Strings.to_plural(cls.__name__)),
+            to_snake_case(to_plural(cls.__name__)),
         )
 
     @classmethod

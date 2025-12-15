@@ -4,7 +4,8 @@ from typing import Any, Literal, Optional, Union
 
 from pydantic import Field, model_validator
 
-from ...utils import Crypto, Strings
+from ...utils.crypto import uuidv7
+from ...utils.strings import format_phone_number
 from ..base.base_model import BaseModel, base_validate_before
 from ..base.fields import EntityIDField, UUIDField
 
@@ -39,7 +40,7 @@ class NewMessageRequest(BaseModel):
 
 class RequestEvent(BaseModel):
     id: Optional[UUIDField] = Field(
-        default_factory=Crypto.uuidv7, title="The unique identifier of the event"
+        default_factory=uuidv7, title="The unique identifier of the event"
     )
     type: Literal["req"]
     agent: Optional[str] = Field(default_factory=str, title="The agent of the event")
@@ -107,8 +108,8 @@ class ResponseDataData(BaseModel):
         res = data.model_dump() if isinstance(data, BaseModel) else dict(data)
         res = dict(res)
 
-        res["phone_number"] = Strings.format_phone_number(res.get("phone_number", ""))
-        res["exchange"] = Strings.format_phone_number(res.get("exchange", ""))
+        res["phone_number"] = format_phone_number(res.get("phone_number", ""))
+        res["exchange"] = format_phone_number(res.get("exchange", ""))
 
         return res
 
@@ -125,7 +126,7 @@ class ResponseData(BaseModel):
 
 class ResponseEvent(BaseModel):
     id: Optional[UUIDField] = Field(
-        default_factory=Crypto.uuidv7, title="The unique identifier of the event"
+        default_factory=uuidv7, title="The unique identifier of the event"
     )
     type: Literal["res"]
     agent: Optional[str] = Field(default_factory=str, title="The agent of the event")
