@@ -4,8 +4,7 @@ from loguru import logger
 from socketio import ASGIApp, AsyncServer
 
 from ..conf import settings
-from ..utils import memoize
-from ..utils.decorators import to_async
+from ..utils.decorators import memoize, to_async
 
 
 @memoize

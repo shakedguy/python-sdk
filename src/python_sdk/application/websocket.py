@@ -6,9 +6,8 @@ from fastapi.websockets import WebSocketState
 from loguru import logger
 from pydantic import BaseModel
 
-from ..utils import memoize
 from ..utils.crypto import uuidv7
-from ..utils.decorators import singleton
+from ..utils.decorators import memoize, singleton
 
 
 class SocketRequest(TypedDict):
