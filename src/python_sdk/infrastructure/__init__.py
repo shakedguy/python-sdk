@@ -4,6 +4,8 @@ from typing import Any, Awaitable
 
 from loguru import logger
 
+from ..conf.constants import PSYCOPG_EXISTS, PYMONGO_EXISTS
+
 
 def init(
         *,
@@ -15,7 +17,7 @@ def init(
 ) -> int:  # noqa:
     logger.debug("Initializing resources")
 
-    if init_postgres:
+    if PSYCOPG_EXISTS and init_postgres:
         init_postgres_client()
 
     if init_cache:
@@ -23,7 +25,7 @@ def init(
 
         init_cache()
 
-    if init_mongo:
+    if PYMONGO_EXISTS and init_mongo:
         init_mongo_clients()
 
     if init_qdrant:
@@ -35,7 +37,6 @@ def init(
 
 def cleanup(*args: Any) -> int:  # noqa:
 
-    from .db import Mongo, Postgres
     logger.debug("Cleaning up resources")
     try:
         from .cache import RedisClient
@@ -105,7 +106,7 @@ async def init_async(
     logger.debug("Initializing resources")
 
     tasks = []
-    if init_postgres:
+    if PSYCOPG_EXISTS and init_postgres:
         from .db import PostgresConnectionPool
 
         tasks.append(PostgresConnectionPool.init_pools_async())
@@ -113,7 +114,7 @@ async def init_async(
         from .cache import init_cache_async
 
         tasks.append(init_cache_async())
-    if init_mongo:
+    if PYMONGO_EXISTS and init_mongo:
         tasks.append(init_mongo_clients_async())
 
     if init_qdrant:
