@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 from contextlib import asynccontextmanager
 from typing import Any, Awaitable, Callable, Optional, Union, cast
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from faststream._internal.fastapi.router import StreamRouter  # noqa
 from loguru import logger
 from pydantic import IPvAnyAddress, PositiveInt, StrictBool
 from socketio import ASGIApp as SocketIOASGIApp
@@ -56,7 +56,6 @@ class API(FastAPI):
         self.websocket_manager: Optional[ConnectionManager] = (
             create_connection_manager() if add_websocket else None
         )
-        self._broker_router: Optional[StreamRouter] = None
         self.broker: Optional[Broker] = None
         self._init_postgres = init_postgres
         self._init_cache = init_cache
@@ -77,6 +76,11 @@ class API(FastAPI):
         self.debug = debug or settings.debug or False
         self.openapi_url = openapi_url
         self.docs_url = docs_url
+        if importlib.util.find_spec("faststream") is not None:
+            from faststream._internal.fastapi.router import StreamRouter  # noqa
+            self._broker_router: Optional[StreamRouter] = None
+        else:
+            self._broker_router = None
 
 
         @asynccontextmanager
