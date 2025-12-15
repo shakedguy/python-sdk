@@ -1769,6 +1769,9 @@ wheels = [
 name = "python-sdk"
 version = "0.1.0"
 source = { editable = "." }
+dependencies = [
+    { name = "urllib3" },
+]
 
 [package.optional-dependencies]
 all = [
@@ -1837,6 +1840,7 @@ requires-dist = [
     { name = "taskiq-aio-pika", marker = "extra == 'messaging'", specifier = ">=0.4.4" },
     { name = "taskiq-faststream", extras = ["kafka", "rabbit", "redis"], marker = "extra == 'all'", specifier = ">=0.3.2" },
     { name = "taskiq-faststream", extras = ["kafka", "rabbit", "redis"], marker = "extra == 'messaging'", specifier = ">=0.3.2" },
+    { name = "urllib3", specifier = ">=2.6.2" },
 ]
 provides-extras = ["mongo", "messaging", "qdrant", "postgres", "all"]
 
