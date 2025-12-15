@@ -3,11 +3,7 @@ from threading import Lock
 from typing import Optional
 
 from loguru import logger
-from motor.motor_asyncio import (
-    AsyncIOMotorClient,
-    AsyncIOMotorCollection,
-    AsyncIOMotorDatabase,
-)
+from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient as SyncMongoClient
 from pymongo.collection import Collection
 from pymongo.database import Database
@@ -43,7 +39,7 @@ class Mongo(AbstractContextManager):
             MongoClients.init_clients()
         return MongoClients.sync_client.get_database(name=settings.mongo.db_name)
 
-    async def __aenter__(self) -> AsyncIOMotorDatabase:
+    async def __aenter__(self):
         if not MongoClients.async_client:
             MongoClients.init_clients()
         return MongoClients.async_client.get_database(name=settings.mongo.db_name)
@@ -80,7 +76,7 @@ class MongoCollection(AbstractContextManager):
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    async def __aenter__(self) -> AsyncIOMotorCollection:
+    async def __aenter__(self):
         async with Mongo() as db:
             return db.get_collection(name=self.name)
 
