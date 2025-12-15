@@ -1,3 +1,5 @@
+import importlib.util
+
 from httpx import Limits, Timeout
 
 SQL_OPERATORS = {
@@ -131,3 +133,8 @@ MIMETYPES = {
 
 
 CACHE_PREFIX = "cache:"
+
+PYMONGO_EXISTS = importlib.util.find_spec("pymongo")
+BSON_EXISTS = importlib.util.find_spec("bson")
+PSYCOPG_EXISTS = importlib.util.find_spec("psycopg")
+QDRANT_CLIENT_EXISTS = importlib.util.find_spec("qdrant_client")
