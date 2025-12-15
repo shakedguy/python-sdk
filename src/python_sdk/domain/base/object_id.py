@@ -134,6 +134,11 @@ def _raise_invalid_id(oid):
         " or a 24-character hex string" % oid)
 
 
+if PY3:
+    _ord = lambda x: x
+else:
+    _ord = ord
+
 class ObjectId(object):
     """A MongoDB ObjectId.
     """
